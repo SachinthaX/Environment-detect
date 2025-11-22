@@ -2,13 +2,16 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+# Import routers for each feature area
+from app.api.v1 import environment, pests, disease, growth
+
 
 app = FastAPI(
     title="Mushroom Project Backend",
-    version="0.1.0",
+    version="0.2.0",
 )
 
-# During development allow all origins (mobile app, emulator, etc.)
+# During development allow all origins (mobile app, emulator, physical phone, etc.)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -17,6 +20,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+# --------- Existing demo endpoints (keep for Home screen test) ---------
 
 class DummyInput(BaseModel):
     value: float
@@ -42,3 +47,30 @@ def predict(input_data: DummyInput):
         "prediction": result,
         "note": "This is a dummy result. Replace with real model later.",
     }
+
+
+# --------- API v1 modular routers ---------
+
+app.include_router(
+    environment.router,
+    prefix="/api/v1/environment",
+    tags=["environment"],
+)
+
+app.include_router(
+    pests.router,
+    prefix="/api/v1/pests",
+    tags=["pests"],
+)
+
+app.include_router(
+    disease.router,
+    prefix="/api/v1/disease",
+    tags=["disease"],
+)
+
+app.include_router(
+    growth.router,
+    prefix="/api/v1/growth",
+    tags=["growth"],
+)
