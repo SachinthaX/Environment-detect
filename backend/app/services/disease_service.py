@@ -2,9 +2,11 @@
 
 from dataclasses import dataclass
 from io import BytesIO
+from pathlib import Path
 
 import numpy as np
 from PIL import Image
+import tensorflow as tf
 
 
 @dataclass
@@ -12,52 +14,71 @@ class DiseasePrediction:
     """
     Internal representation of a disease prediction.
     """
-    label: str        # "healthy" | "black_mold" | "green_mold"
+    label: str
     confidence: float
 
 
-def _load_image(image_bytes: bytes) -> np.ndarray:
+# Must match the order you used in Colab:
+# CLASS_NAMES = ['healthy', 'black_mold', 'green_mold']
+CLASS_NAMES = ["healthy", "black_mold", "green_mold"]
+
+IMG_SIZE = (224, 224)
+
+# Resolve path to backend/ folder, then to models/mushroom_disease_model.h5
+BASE_DIR = Path(__file__).resolve().parents[2]  # .../backend
+MODEL_PATH = BASE_DIR / "models" / "mushroom_disease_model.h5"
+
+_model = None
+
+
+def _get_model():
     """
-    Load the uploaded image into a normalized NumPy array (values 0..1).
+    Load the TensorFlow model once and reuse it.
+    """
+    global _model
+    if _model is None:
+        if not MODEL_PATH.exists():
+            raise FileNotFoundError(f"Model file not found at: {MODEL_PATH}")
+        _model = tf.keras.models.load_model(MODEL_PATH)
+    return _model
+
+
+def _preprocess_image(image_bytes: bytes) -> np.ndarray:
+    """
+    Convert uploaded image bytes into a batch tensor.
+
+    IMPORTANT:
+    The Keras model already has a Rescaling layer that converts
+    [0, 255] -> [-1, 1]. So here we only:
+      - load the image
+      - resize
+      - convert to float32
+      - add batch dimension
+    No extra manual normalization.
     """
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
-    arr = np.array(image).astype("float32") / 255.0
+    image = image.resize(IMG_SIZE)
+
+    arr = np.array(image).astype("float32")  # values 0..255
+    arr = np.expand_dims(arr, axis=0)       # shape (1, 224, 224, 3)
+
     return arr
+
+
 
 
 def predict_disease_from_image(image_bytes: bytes) -> DiseasePrediction:
     """
-    TEMPORARY HEURISTIC MODEL.
-
-    This is *not* your real CNN. It just uses simple color statistics
-    so that you can test the pipeline (backend + mobile app).
-
-    Later, when you train a model in Google Colab, you will:
-      - save the trained model to a file
-      - load that model here
-      - replace this function to use the real model.
+    Run inference using the trained Keras model and return label + confidence.
     """
-    img = _load_image(image_bytes)
+    model = _get_model()
+    input_tensor = _preprocess_image(image_bytes)
 
-    mean_r = float(img[..., 0].mean())
-    mean_g = float(img[..., 1].mean())
-    mean_b = float(img[..., 2].mean())
+    preds = model.predict(input_tensor)
+    preds = preds[0]  # shape (num_classes,)
 
-    # Very simple rules:
-    # - If green channel clearly dominates -> guess "green_mold"
-    # - If image is dark & a bit reddish -> guess "black_mold"
-    # - Otherwise -> "healthy"
-
-    avg_brightness = (mean_r + mean_g + mean_b) / 3.0
-
-    if mean_g > mean_r + 0.05 and mean_g > mean_b + 0.05:
-        label = "green_mold"
-        confidence = 0.7
-    elif avg_brightness < 0.35 and mean_r > mean_b:
-        label = "black_mold"
-        confidence = 0.7
-    else:
-        label = "healthy"
-        confidence = 0.6
+    class_idx = int(np.argmax(preds))
+    confidence = float(preds[class_idx])
+    label = CLASS_NAMES[class_idx]
 
     return DiseasePrediction(label=label, confidence=confidence)
