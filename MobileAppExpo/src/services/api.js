@@ -1,7 +1,7 @@
 // src/services/api.js
 
 // Change this IP if your PC IP changes
-export const BACKEND_URL = 'http://192.168.8.117:8000';
+export const BACKEND_URL = 'http://192.168.1.5:8000';
 
 export async function pingBackend() {
   const response = await fetch(`${BACKEND_URL}/ping`);

@@ -21,49 +21,108 @@ const DiseaseDetectionScreen = () => {
   const [loading, setLoading] = useState(false);
   const [backendStatus, setBackendStatus] = useState('Checking...');
 
-  // Ask for gallery permission and ping backend when screen loads
+  // Helper to support both old (MediaTypeOptions) and new (MediaType) APIs
+  const getImagesMediaType = () => {
+    if (ImagePicker.MediaType) {
+      // new API
+      return ImagePicker.MediaType.Images;
+    }
+    // fallback for older versions
+    return ImagePicker.MediaTypeOptions.Images;
+  };
+
   useEffect(() => {
     (async () => {
-      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-      if (status !== 'granted') {
-        Alert.alert(
-          'Permission needed',
-          'We need access to your gallery to pick mushroom images.'
-        );
+      try {
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission needed',
+            'We need access to your gallery to pick mushroom images.'
+          );
+        }
+      } catch (e) {
+        console.log('Permission error (gallery):', e);
       }
     })();
 
-    pingBackend()
-      .then(() => setBackendStatus('Online'))
-      .catch(() => setBackendStatus('Offline'));
+    (async () => {
+      const res = await pingBackend();
+      if (res) {
+        setBackendStatus('Online');
+      } else {
+        setBackendStatus('Offline');
+      }
+    })();
   }, []);
 
+  // Pick from gallery
   const pickImage = async () => {
-    setPrediction(null);
+    try {
+      setPrediction(null);
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      quality: 1,
-    });
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: getImagesMediaType(),
+        quality: 1,
+      });
 
-    if (!result.canceled && result.assets && result.assets.length > 0) {
-      setImageUri(result.assets[0].uri);
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.log('pickImage error:', e);
+      Alert.alert(
+        'Error',
+        e.message || 'Failed to open image picker (gallery).'
+      );
+    }
+  };
+
+  // Capture with camera
+  const takePhoto = async () => {
+    try {
+      setPrediction(null);
+
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission needed',
+          'We need access to your camera to capture mushroom images.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: getImagesMediaType(),
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.log('takePhoto error:', e);
+      Alert.alert(
+        'Error',
+        e.message || 'Failed to open camera.'
+      );
     }
   };
 
   const handlePredict = async () => {
     if (!imageUri) {
-      Alert.alert('No image', 'Please choose a mushroom image first.');
+      Alert.alert('No image', 'Please choose or capture a mushroom image first.');
       return;
     }
 
     try {
       setLoading(true);
       setPrediction(null);
-      const data = await predictDiseaseFromImage(imageUri); // { label, confidence }
+      const data = await predictDiseaseFromImage(imageUri);
       setPrediction(data);
     } catch (error) {
-      console.error(error);
+      console.log('predictDisease error:', error);
       Alert.alert('Error', error.message || 'Prediction failed');
     } finally {
       setLoading(false);
@@ -91,25 +150,41 @@ const DiseaseDetectionScreen = () => {
           <Button title="Choose Image" onPress={pickImage} />
         </View>
         <View style={styles.buttonWrapper}>
-          <Button title="Predict Disease" onPress={handlePredict} />
+          <Button title="Capture Image" onPress={takePhoto} />
         </View>
+      </View>
+
+      <View style={styles.buttonSingleWrapper}>
+        <Button title="Predict Disease" onPress={handlePredict} />
       </View>
 
       {loading && (
         <ActivityIndicator style={{ marginTop: 20 }} />
       )}
 
-      {prediction && (
-        <View style={styles.resultBox}>
-          <Text style={styles.resultLabel}>Prediction</Text>
-          <Text style={styles.resultText}>
-            {prediction.label}
-          </Text>
-          <Text style={styles.resultConf}>
-            Confidence: {(prediction.confidence * 100).toFixed(1)}%
-          </Text>
-        </View>
-      )}
+    {prediction && (
+  prediction.label === 'invalid_image' ? (
+    <View style={styles.resultBox}>
+      <Text style={styles.resultLabel}>Result</Text>
+      <Text style={styles.resultText}>Invalid image</Text>
+      <Text style={styles.resultConf}>
+        Please capture or choose a clear image of a mushroom cultivation bag
+        showing healthy mycelium or disease.
+      </Text>
+    </View>
+  ) : (
+    <View style={styles.resultBox}>
+      <Text style={styles.resultLabel}>Prediction</Text>
+      <Text style={styles.resultText}>
+        {prediction.label}
+      </Text>
+      <Text style={styles.resultConf}>
+        Confidence: {(prediction.confidence * 100).toFixed(1)}%
+      </Text>
+    </View>
+  )
+)}
+
     </ScrollView>
   );
 };
@@ -148,11 +223,14 @@ const styles = StyleSheet.create({
   buttonsRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   buttonWrapper: {
     flex: 1,
     marginHorizontal: 4,
+  },
+  buttonSingleWrapper: {
+    marginVertical: 8,
   },
   resultBox: {
     marginTop: 16,

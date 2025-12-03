@@ -18,13 +18,17 @@ class DiseasePrediction:
     confidence: float
 
 
-# Must match the order you used in Colab:
+# Must match the order used in Colab:
 # CLASS_NAMES = ['healthy', 'black_mold', 'green_mold']
 CLASS_NAMES = ["healthy", "black_mold", "green_mold"]
 
 IMG_SIZE = (224, 224)
 
-# Resolve path to backend/ folder, then to models/mushroom_disease_model.h5
+# If max softmax probability is below this, we call it "invalid" / not a mushroom bag
+CONFIDENCE_THRESHOLD = 0.80  # you can tune this value later
+INVALID_LABEL = "invalid_image"
+
+# Path to backend/models/mushroom_disease_model.h5
 BASE_DIR = Path(__file__).resolve().parents[2]  # .../backend
 MODEL_PATH = BASE_DIR / "models" / "mushroom_disease_model.h5"
 
@@ -47,14 +51,12 @@ def _preprocess_image(image_bytes: bytes) -> np.ndarray:
     """
     Convert uploaded image bytes into a batch tensor.
 
-    IMPORTANT:
     The Keras model already has a Rescaling layer that converts
     [0, 255] -> [-1, 1]. So here we only:
       - load the image
       - resize
       - convert to float32
       - add batch dimension
-    No extra manual normalization.
     """
     image = Image.open(BytesIO(image_bytes)).convert("RGB")
     image = image.resize(IMG_SIZE)
@@ -65,11 +67,12 @@ def _preprocess_image(image_bytes: bytes) -> np.ndarray:
     return arr
 
 
-
-
 def predict_disease_from_image(image_bytes: bytes) -> DiseasePrediction:
     """
     Run inference using the trained Keras model and return label + confidence.
+
+    If the model is not confident enough (max probability < CONFIDENCE_THRESHOLD),
+    we treat the image as invalid / out-of-domain.
     """
     model = _get_model()
     input_tensor = _preprocess_image(image_bytes)
@@ -79,6 +82,10 @@ def predict_disease_from_image(image_bytes: bytes) -> DiseasePrediction:
 
     class_idx = int(np.argmax(preds))
     confidence = float(preds[class_idx])
-    label = CLASS_NAMES[class_idx]
 
+    if confidence < CONFIDENCE_THRESHOLD:
+        # Not confident -> we say this is not a valid mushroom-disease image
+        return DiseasePrediction(label=INVALID_LABEL, confidence=confidence)
+
+    label = CLASS_NAMES[class_idx]
     return DiseasePrediction(label=label, confidence=confidence)
