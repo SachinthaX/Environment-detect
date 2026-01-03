@@ -1,0 +1,6 @@
+# Python
+__pycache__/
+*.py[cod]
+
+# Local dev DB (ignore specific file so you don't accidentally ignore real migration/db assets)
+backend/environment.db
