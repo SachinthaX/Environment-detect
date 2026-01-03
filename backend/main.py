@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from app.db.environment_db import init_db
+
 
 # Import routers for each feature area
 from app.api.v1 import environment, pests, disease, growth
@@ -25,6 +27,10 @@ app.add_middleware(
 
 class DummyInput(BaseModel):
     value: float
+
+@app.on_event("startup")
+def on_startup():
+    init_db()
 
 
 @app.get("/ping")
