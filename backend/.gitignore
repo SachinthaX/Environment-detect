@@ -4,3 +4,6 @@ __pycache__/
 
 # Local dev DB (ignore specific file so you don't accidentally ignore real migration/db assets)
 environment.db*
+
+.env
+.env*.local

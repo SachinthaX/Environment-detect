@@ -295,17 +295,26 @@ export default function EnvironmentScreen() {
   const rhInRange =
     reading && range ? reading.humidity >= range.rh_min && reading.humidity <= range.rh_max : null;
 
-  const hasCo2Range =
-  range &&
-  range.co2_min != null &&
-  range.co2_max != null &&
-  Number.isFinite(Number(range.co2_min)) &&
-  Number.isFinite(Number(range.co2_max));
+  const co2Min = range?.co2_min;
+  const co2Max = range?.co2_max;
+
+  const hasCo2Min = co2Min != null && Number.isFinite(Number(co2Min));
+  const hasCo2Max = co2Max != null && Number.isFinite(Number(co2Max));
+  const hasAnyCo2 = !!range && (hasCo2Min || hasCo2Max);
 
   const co2InRange =
-    co2Value != null && hasCo2Range
-      ? Number(co2Value) >= Number(range.co2_min) && Number(co2Value) <= Number(range.co2_max)
+    co2Value != null && hasAnyCo2
+      ? (hasCo2Min ? Number(co2Value) >= Number(co2Min) : true) &&
+        (hasCo2Max ? Number(co2Value) <= Number(co2Max) : true)
       : null;
+
+  const co2RangeLabel = useMemo(() => {
+    if (!hasAnyCo2) return null;
+    if (hasCo2Min && hasCo2Max) return `${Number(co2Min)}–${Number(co2Max)} ppm`;
+    if (hasCo2Max) return `≤ ${Number(co2Max)} ppm`;
+    return `≥ ${Number(co2Min)} ppm`;
+  }, [hasAnyCo2, hasCo2Min, hasCo2Max, co2Min, co2Max]);
+
 
 
   async function loadRecommendation(forceSource, forceDate) {
@@ -521,6 +530,15 @@ export default function EnvironmentScreen() {
           <Text style={styles.cardRow}>
             CO₂ (estimated): <Text style={styles.value}>{co2Value?.toFixed?.(0) ?? '-'}</Text> ppm
           </Text>
+          <Text style={styles.updatedText}>
+            Last updated:{' '}
+            <Text style={styles.value}>
+              {health?.seconds_since_last != null ? `${health.seconds_since_last}s ago` : '-'}
+            </Text>
+          </Text>
+
+
+
         </View>
 
         <View style={styles.card}>
@@ -577,9 +595,9 @@ export default function EnvironmentScreen() {
                   </Text>
                 )}
               </Text>
-              {hasCo2Range ? (
+              {hasAnyCo2 ? (
                 <Text style={styles.cardRow}>
-                  CO₂ : {range.co2_min}–{range.co2_max} ppm{' '}
+                  CO₂ : {co2RangeLabel}{' '}
                   {co2InRange === null ? null : (
                     <Text style={co2InRange ? styles.within : styles.out}>
                       {co2InRange ? '(within)' : '(out)'}
@@ -589,6 +607,8 @@ export default function EnvironmentScreen() {
               ) : (
                 <Text style={styles.note}>CO₂ range not available for this variety.</Text>
               )}
+
+
 
             </View>
           ) : (
@@ -816,6 +836,8 @@ const styles = StyleSheet.create({
   note: { color: '#9ca3af', marginTop: 10, fontSize: 12 },
   within: { color: '#86efac' },
   out: { color: '#fca5a5' },
+  updatedText: { color: '#9ca3af', marginTop: 10, fontSize: 11 },
+
 
   alertText: { color: '#fca5a5', marginTop: 6, lineHeight: 20, fontWeight: '700' },
 

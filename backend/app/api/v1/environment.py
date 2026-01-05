@@ -1,31 +1,31 @@
-from fastapi import APIRouter
-from app.schemas.environment import EnvironmentStatusOut
-from app.services.environment_service import get_environment_status
-from app.schemas.environment import HistoryResponseOut, AvailableDatesOut
-from app.services.environment_service import get_environment_history, get_environment_available_dates
-from app.schemas.environment import EnvironmentRecommendationOut
-from app.services.environment_service import get_environment_recommendation
-from app.schemas.environment import EnvironmentHealthOut
-from app.services.environment_service import get_environment_health
+from __future__ import annotations
 
-from app.schemas.environment import EnvironmentProfileIn, EnvironmentProfileOut, OptimalRangeOut
-from app.services.environment_service import (
-    get_environment_options,
-    get_environment_profile,
-    update_environment_profile,
-    get_optimal_range,
-)
-
+from fastapi import APIRouter, HTTPException
 
 from app.schemas.environment import (
     EnvironmentReadingIn,
     EnvironmentReadingOut,
-    EnvironmentRecommendation,
+    EnvironmentStatusOut,
+    EnvironmentProfileIn,
+    EnvironmentProfileOut,
+    OptimalRangeOut,
+    EnvironmentRecommendationOut,
+    HistoryResponseOut,
+    AvailableDatesOut,
+    EnvironmentHealthOut,
 )
+
 from app.services.environment_service import (
     save_environment_reading,
-    get_current_environment_reading,
-    
+    get_environment_status,
+    get_environment_recommendation,
+    get_environment_options,
+    get_environment_profile,
+    update_environment_profile,
+    get_optimal_range,
+    get_environment_history,
+    get_environment_available_dates,
+    get_environment_health,
 )
 
 router = APIRouter()
@@ -37,18 +37,20 @@ def ingest_environment_reading(payload: EnvironmentReadingIn):
 
 
 @router.get("/status", response_model=EnvironmentStatusOut)
-def get_current_environment_status():
+def read_status():
     return get_environment_status()
 
 
-
 @router.get("/recommendation", response_model=EnvironmentRecommendationOut)
-def get_environment_recommendation_api(source: str = "current", date: str | None = None):
-    return get_environment_recommendation(source, date)
+def read_recommendation(source: str = "current", date: str | None = None):
+    try:
+        return get_environment_recommendation(source, date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/options")
-def environment_options():
+def read_options():
     return get_environment_options()
 
 
@@ -59,21 +61,32 @@ def read_profile():
 
 @router.put("/profile", response_model=EnvironmentProfileOut)
 def write_profile(payload: EnvironmentProfileIn):
-    return update_environment_profile(payload)
+    try:
+        return update_environment_profile(payload)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/optimal-range", response_model=OptimalRangeOut)
 def read_optimal_range(mushroom_type: str, stage: str):
-    return get_optimal_range(mushroom_type, stage)
+    try:
+        return get_optimal_range(mushroom_type, stage)
+    except ValueError as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
 
 @router.get("/history", response_model=HistoryResponseOut)
 def read_history(range: str, date: str | None = None):
-    return get_environment_history(range, date)
+    try:
+        return get_environment_history(range, date)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 
 @router.get("/available-dates", response_model=AvailableDatesOut)
 def read_available_dates():
     return get_environment_available_dates()
+
 
 @router.get("/health", response_model=EnvironmentHealthOut)
 def read_health(offline_after_seconds: int = 60):
