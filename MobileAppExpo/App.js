@@ -8,6 +8,8 @@ import EnvironmentScreen from './src/screens/EnvironmentScreen';
 import PestDetectionScreen from './src/screens/PestDetectionScreen';
 import DiseaseDetectionScreen from './src/screens/DiseaseDetectionScreen';
 import GrowthPredictionScreen from './src/screens/GrowthPredictionScreen';
+import MushroomTypeScreen from "./src/screens/MushroomTypeScreen";
+
 
 const Tab = createBottomTabNavigator();
 
@@ -29,6 +31,7 @@ export default function App() {
         <Tab.Screen name="Pests" component={PestDetectionScreen} />
         <Tab.Screen name="Disease" component={DiseaseDetectionScreen} />
         <Tab.Screen name="Growth" component={GrowthPredictionScreen} />
+        <Tab.Screen name="MushroomType" component={MushroomTypeScreen} />
       </Tab.Navigator>
     </NavigationContainer>
   );
