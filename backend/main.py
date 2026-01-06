@@ -8,6 +8,9 @@ from app.api.v1.growth import router as growth_router
 from app.api.v1.pests import router as pests_router
 from app.api.v1.disease import router as disease_router
 
+# If you have mushroom type classification router
+from app.api.v1.type import router as type_router
+
 app = FastAPI(
     title="Mushroom Cultivation Backend",
     version="1.0.0",
@@ -16,7 +19,7 @@ app = FastAPI(
 # CORS so your Expo app can talk to the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # for dev; later you can restrict
+    allow_origins=["*"],  # for dev; later restrict
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -28,28 +31,37 @@ def ping():
     return {"message": "pong"}
 
 
-# Group other team members’ endpoints
+# Environment endpoints
 app.include_router(
     environment_router,
     prefix="/api/v1/environment",
     tags=["environment"],
 )
 
+# Growth endpoints
 app.include_router(
     growth_router,
     prefix="/api/v1/growth",
     tags=["growth"],
 )
 
+# Pests endpoints
 app.include_router(
     pests_router,
     prefix="/api/v1/pests",
     tags=["pests"],
 )
 
-# Your part: disease detection
+# Disease detection endpoints
 app.include_router(
     disease_router,
     prefix="/api/v1/disease",
     tags=["disease"],
+)
+
+# Mushroom type classification endpoints (if used)
+app.include_router(
+    type_router,
+    prefix="/api/v1/type",
+    tags=["type"],
 )
