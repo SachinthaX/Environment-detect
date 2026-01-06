@@ -1,54 +1,12 @@
 // src/services/api.js
-import { Platform } from "react-native";
 
-/**
- * Web runs on your PC browser, so it should call backend via localhost.
- * Mobile (Expo Go) must call backend via your PC LAN IP.
- */
-export const BACKEND_URL =
-  Platform.OS === "web"
-    ? "http://127.0.0.1:8000"
-    : "http://192.168.1.47:8000";
+// Change this IP if your PC IP changes
+export const BACKEND_URL = 'http://192.168.1.10:8000';
 
-export function getBackendUrl() {
-  return BACKEND_URL;
-}
-
-export function buildUrl(path) {
-  // ensures path starts with /
-  const p = path.startsWith("/") ? path : `/${path}`;
-  return `${BACKEND_URL}${p}`;
-}
-
-/**
- * GET /ping
- */
 export async function pingBackend() {
-  const response = await fetch(buildUrl("/ping"));
+  const response = await fetch(`${BACKEND_URL}/ping`);
   if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Bad response from /ping (${response.status}) ${text}`);
-  }
-  return response.json();
-}
-
-/**
- * POST /predict (your existing dummy endpoint)
- * This keeps your current screens working if they still use /predict
- */
-export async function predictDummy(value) {
-  const response = await fetch(buildUrl("/predict"), {
-    method: "POST",
-    headers: {
-      Accept: "application/json",
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ value }),
-  });
-
-  if (!response.ok) {
-    const text = await response.text().catch(() => "");
-    throw new Error(`Bad response from /predict (${response.status}) ${text}`);
+    throw new Error('Bad response from /ping');
   }
   return response.json();
 }
@@ -97,6 +55,22 @@ export async function predictMushroomType(imageUri) {
     method: "POST",
     headers: {
       Accept: "application/json",
+// Send an image file to the backend and get disease prediction
+export async function predictDiseaseFromImage(imageUri) {
+  const formData = new FormData();
+
+  // React Native / Expo file object
+  formData.append('file', {
+    uri: imageUri,
+    name: 'mushroom.jpg',        // name can be anything
+    type: 'image/jpeg',          // or 'image/png' if you know it
+  });
+
+  const response = await fetch(`${BACKEND_URL}/api/v1/disease/predict`, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      // Do NOT set 'Content-Type' here; RN will set correct multipart boundary
     },
     body: formData,
   });
@@ -109,3 +83,11 @@ export async function predictMushroomType(imageUri) {
 
   return data;
 }
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Backend error (${response.status}): ${text}`);
+  }
+
+  return response.json(); // { label, confidence }
+}
+
