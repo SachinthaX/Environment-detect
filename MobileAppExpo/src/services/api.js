@@ -11,6 +11,50 @@ export async function pingBackend() {
   return response.json();
 }
 
+/**
+ * POST /type/predict (Mushroom Type Classification)
+ * Upload image using multipart/form-data
+ */
+export async function predictMushroomType(imageUri) {
+  const url = buildUrl("/type/predict");
+
+  // WEB: need real File/Blob
+  if (Platform.OS === "web") {
+    // imageUri will be a blob URL in web (like blob:http://localhost:8081/...)
+    const imgRes = await fetch(imageUri);
+    const blob = await imgRes.blob();
+
+    const formData = new FormData();
+    formData.append("file", blob, "mushroom.jpg");
+
+    const response = await fetch(url, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+      },
+      body: formData,
+    });
+
+    const data = await response.json().catch(() => null);
+    if (!response.ok) {
+      const msg = data?.detail || `Bad response from /type/predict (${response.status})`;
+      throw new Error(msg);
+    }
+    return data;
+  }
+
+  // MOBILE (Expo Go / Android / iOS): uri object works
+  const formData = new FormData();
+  formData.append("file", {
+    uri: imageUri,
+    name: "mushroom.jpg",
+    type: "image/jpeg",
+  });
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
 // Send an image file to the backend and get disease prediction
 export async function predictDiseaseFromImage(imageUri) {
   const formData = new FormData();
@@ -31,6 +75,14 @@ export async function predictDiseaseFromImage(imageUri) {
     body: formData,
   });
 
+  const data = await response.json().catch(() => null);
+  if (!response.ok) {
+    const msg = data?.detail || `Bad response from /type/predict (${response.status})`;
+    throw new Error(msg);
+  }
+
+  return data;
+}
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Backend error (${response.status}): ${text}`);
