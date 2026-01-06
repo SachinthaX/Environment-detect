@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from app.api.v1.type import router as type_router
+
 
 # Import routers for each feature area
 from app.api.v1 import environment, pests, disease, growth
@@ -74,3 +76,8 @@ app.include_router(
     prefix="/api/v1/growth",
     tags=["growth"],
 )
+
+app.include_router(
+    type_router
+)
+
