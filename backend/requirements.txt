@@ -2,3 +2,6 @@ fastapi
 uvicorn[standard]
 pydantic
 numpy
+pillow
+python-multipart
+tensorflow
