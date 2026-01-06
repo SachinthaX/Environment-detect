@@ -3,6 +3,19 @@
 // Change this IP if your PC IP changes
 export const BACKEND_URL = 'http://192.168.1.10:8000';
 
+export function getBackendUrl() {
+  return BACKEND_URL;
+}
+
+export function buildUrl(path) {
+  // ensures path starts with /
+  const p = path.startsWith("/") ? path : `/${path}`;
+  return `${BACKEND_URL}${p}`;
+}
+ 
+/**
+ * GET /ping
+ */
 export async function pingBackend() {
   const response = await fetch(`${BACKEND_URL}/ping`);
   if (!response.ok) {
