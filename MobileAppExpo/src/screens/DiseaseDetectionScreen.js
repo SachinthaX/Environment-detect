@@ -2,89 +2,254 @@
 
 import React, { useEffect, useState } from 'react';
 import {
-  SafeAreaView,
-  StyleSheet,
-  Text,
   View,
+  Text,
+  Button,
+  Image,
+  StyleSheet,
+  ScrollView,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
-import { predictDisease } from '../services/diseaseApi';
+import * as ImagePicker from 'expo-image-picker';
 
-export default function DiseaseDetectionScreen() {
-  const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+import { pingBackend, predictDiseaseFromImage } from '../services/api';
+
+const DiseaseDetectionScreen = () => {
+  const [imageUri, setImageUri] = useState(null);
+  const [prediction, setPrediction] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [backendStatus, setBackendStatus] = useState('Checking...');
+
+  // Helper to support both old (MediaTypeOptions) and new (MediaType) APIs
+  const getImagesMediaType = () => {
+    if (ImagePicker.MediaType) {
+      // new API
+      return ImagePicker.MediaType.Images;
+    }
+    // fallback for older versions
+    return ImagePicker.MediaTypeOptions.Images;
+  };
 
   useEffect(() => {
-    const load = async () => {
+    (async () => {
       try {
-        setLoading(true);
-        setError('');
-        setResult(null);
-
-        const data = await predictDisease('sample-1');
-        console.log('Disease result:', data);
-        setResult(data);
-      } catch (err) {
-        console.log('Disease error:', err);
-        setError('Failed to load disease prediction');
-      } finally {
-        setLoading(false);
+        const { status } =
+          await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+          Alert.alert(
+            'Permission needed',
+            'We need access to your gallery to pick mushroom images.'
+          );
+        }
+      } catch (e) {
+        console.log('Permission error (gallery):', e);
       }
-    };
+    })();
 
-    load();
+    (async () => {
+      const res = await pingBackend();
+      if (res) {
+        setBackendStatus('Online');
+      } else {
+        setBackendStatus('Offline');
+      }
+    })();
   }, []);
 
+  // Pick from gallery
+  const pickImage = async () => {
+    try {
+      setPrediction(null);
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: getImagesMediaType(),
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.log('pickImage error:', e);
+      Alert.alert(
+        'Error',
+        e.message || 'Failed to open image picker (gallery).'
+      );
+    }
+  };
+
+  // Capture with camera
+  const takePhoto = async () => {
+    try {
+      setPrediction(null);
+
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert(
+          'Permission needed',
+          'We need access to your camera to capture mushroom images.'
+        );
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: getImagesMediaType(),
+        quality: 1,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        setImageUri(result.assets[0].uri);
+      }
+    } catch (e) {
+      console.log('takePhoto error:', e);
+      Alert.alert(
+        'Error',
+        e.message || 'Failed to open camera.'
+      );
+    }
+  };
+
+  const handlePredict = async () => {
+    if (!imageUri) {
+      Alert.alert('No image', 'Please choose or capture a mushroom image first.');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setPrediction(null);
+      const data = await predictDiseaseFromImage(imageUri);
+      setPrediction(data);
+    } catch (error) {
+      console.log('predictDisease error:', error);
+      Alert.alert('Error', error.message || 'Prediction failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
-    <SafeAreaView style={styles.safeArea}>
-      <View style={styles.container}>
-        <Text style={styles.title}>Disease Detection</Text>
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Mushroom Disease Detection</Text>
 
-        {loading && <ActivityIndicator />}
+      <Text style={styles.status}>
+        Backend status: {backendStatus}
+      </Text>
 
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        {result && (
-          <View style={styles.card}>
-            <Text style={styles.cardText}>
-              Disease: {result.disease_name}
-            </Text>
-            <Text style={styles.cardText}>
-              Confidence: {result.confidence}
-            </Text>
-            <Text style={styles.cardText}>
-              Severity: {result.severity}
-            </Text>
-            <Text style={styles.cardText}>
-              Treatment: {result.treatment}
-            </Text>
-          </View>
+      <View style={styles.imageBox}>
+        {imageUri ? (
+          <Image source={{ uri: imageUri }} style={styles.image} />
+        ) : (
+          <Text style={styles.placeholder}>No image selected</Text>
         )}
       </View>
-    </SafeAreaView>
+
+      <View style={styles.buttonsRow}>
+        <View style={styles.buttonWrapper}>
+          <Button title="Choose Image" onPress={pickImage} />
+        </View>
+        <View style={styles.buttonWrapper}>
+          <Button title="Capture Image" onPress={takePhoto} />
+        </View>
+      </View>
+
+      <View style={styles.buttonSingleWrapper}>
+        <Button title="Predict Disease" onPress={handlePredict} />
+      </View>
+
+      {loading && (
+        <ActivityIndicator style={{ marginTop: 20 }} />
+      )}
+
+    {prediction && (
+  prediction.label === 'invalid_image' ? (
+    <View style={styles.resultBox}>
+      <Text style={styles.resultLabel}>Result</Text>
+      <Text style={styles.resultText}>Invalid image</Text>
+      <Text style={styles.resultConf}>
+        Please capture or choose a clear image of a mushroom cultivation bag
+        showing healthy mycelium or disease.
+      </Text>
+    </View>
+  ) : (
+    <View style={styles.resultBox}>
+      <Text style={styles.resultLabel}>Prediction</Text>
+      <Text style={styles.resultText}>
+        {prediction.label}
+      </Text>
+      <Text style={styles.resultConf}>
+        Confidence: {(prediction.confidence * 100).toFixed(1)}%
+      </Text>
+    </View>
+  )
+)}
+
+    </ScrollView>
   );
-}
+};
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: '#0f172a' },
-  container: { flex: 1, paddingHorizontal: 24, paddingVertical: 32 },
+  container: {
+    padding: 16,
+    paddingBottom: 32,
+  },
   title: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: '700',
-    color: '#e5e7eb',
+    marginBottom: 8,
+  },
+  status: {
     marginBottom: 16,
   },
-  card: {
-    backgroundColor: '#111827',
-    borderRadius: 16,
-    padding: 16,
-    marginTop: 12,
+  imageBox: {
+    width: '100%',
+    aspectRatio: 1,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#ccc',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
   },
-  cardText: {
-    color: '#d1d5db',
-    fontSize: 14,
+  image: {
+    width: '100%',
+    height: '100%',
+  },
+  placeholder: {
+    color: '#777',
+  },
+  buttonsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  buttonWrapper: {
+    flex: 1,
+    marginHorizontal: 4,
+  },
+  buttonSingleWrapper: {
+    marginVertical: 8,
+  },
+  resultBox: {
+    marginTop: 16,
+    padding: 16,
+    borderRadius: 8,
+    backgroundColor: '#f2f2f2',
+  },
+  resultLabel: {
+    fontWeight: '600',
     marginBottom: 4,
   },
-  error: { color: '#f97373', marginTop: 16 },
+  resultText: {
+    fontSize: 18,
+    fontWeight: '700',
+    textTransform: 'capitalize',
+  },
+  resultConf: {
+    marginTop: 4,
+  },
 });
+
+export default DiseaseDetectionScreen;

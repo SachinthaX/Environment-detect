@@ -1,83 +1,67 @@
+# backend/main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+
+from app.api.v1.environment import router as environment_router
+from app.api.v1.growth import router as growth_router
+from app.api.v1.pests import router as pests_router
+from app.api.v1.disease import router as disease_router
+
+# If you have mushroom type classification router
 from app.api.v1.type import router as type_router
 
-
-# Import routers for each feature area
-from app.api.v1 import environment, pests, disease, growth
-
-
 app = FastAPI(
-    title="Mushroom Project Backend",
-    version="0.2.0",
+    title="Mushroom Cultivation Backend",
+    version="1.0.0",
 )
 
-# During development allow all origins (mobile app, emulator, physical phone, etc.)
+# CORS so your Expo app can talk to the backend
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # for dev; later restrict
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# --------- Existing demo endpoints (keep for Home screen test) ---------
-
-class DummyInput(BaseModel):
-    value: float
-
-
 @app.get("/ping")
 def ping():
-    """
-    Simple health check endpoint.
-    """
-    return {"message": "Backend is working!"}
+    return {"message": "pong"}
 
 
-@app.post("/predict")
-def predict(input_data: DummyInput):
-    """
-    Dummy ML endpoint for testing.
-    For now: prediction = value * 2
-    """
-    result = input_data.value * 2
-    return {
-        "input": input_data.value,
-        "prediction": result,
-        "note": "This is a dummy result. Replace with real model later.",
-    }
-
-
-# --------- API v1 modular routers ---------
-
+# Environment endpoints
 app.include_router(
-    environment.router,
+    environment_router,
     prefix="/api/v1/environment",
     tags=["environment"],
 )
 
+# Growth endpoints
 app.include_router(
-    pests.router,
-    prefix="/api/v1/pests",
-    tags=["pests"],
-)
-
-app.include_router(
-    disease.router,
-    prefix="/api/v1/disease",
-    tags=["disease"],
-)
-
-app.include_router(
-    growth.router,
+    growth_router,
     prefix="/api/v1/growth",
     tags=["growth"],
 )
 
+# Pests endpoints
 app.include_router(
-    type_router
+    pests_router,
+    prefix="/api/v1/pests",
+    tags=["pests"],
 )
 
+# Disease detection endpoints
+app.include_router(
+    disease_router,
+    prefix="/api/v1/disease",
+    tags=["disease"],
+)
+
+# Mushroom type classification endpoints (if used)
+app.include_router(
+    type_router,
+    prefix="/api/v1/type",
+    tags=["type"],
+)

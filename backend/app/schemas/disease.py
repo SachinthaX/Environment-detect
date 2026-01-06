@@ -1,12 +1,11 @@
+# backend/app/schemas/disease.py
+
 from pydantic import BaseModel
 
 
-class DiseasePredictionRequest(BaseModel):
-    sample_id: str
-
-
 class DiseasePredictionResponse(BaseModel):
-    disease_name: str
-    confidence: float
-    severity: str
-    treatment: str
+    """
+    Response returned to the mobile app after disease prediction.
+    """
+    label: str        # "healthy" | "black_mold" | "green_mold"
+    confidence: float # 0.0 - 1.0
