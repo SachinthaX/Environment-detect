@@ -19,7 +19,7 @@ export function buildUrl(path) {
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${BACKEND_URL}${p}`;
 }
-
+ 
 /**
  * GET /ping
  */
