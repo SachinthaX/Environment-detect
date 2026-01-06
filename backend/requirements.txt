@@ -1,7 +1,7 @@
 fastapi
 uvicorn[standard]
 pydantic
-python-multipart
-pillow
 numpy
-tflite-runtime
+pillow
+python-multipart
+tensorflow
