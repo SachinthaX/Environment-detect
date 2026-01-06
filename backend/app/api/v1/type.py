@@ -3,7 +3,7 @@ from fastapi import APIRouter, UploadFile, File, HTTPException
 from app.schemas.type import TypePredictionResponse, TopKItem
 from app.services.type_service import predict_type, ALLOWED_CONTENT_TYPES
 
-router = APIRouter(prefix="/type", tags=["Mushroom Type"])
+router = APIRouter(tags=["Mushroom Type"])  # <-- removed prefix="/type"
 
 
 @router.post("/predict", response_model=TypePredictionResponse)
@@ -33,8 +33,6 @@ async def predict_mushroom_type(file: UploadFile = File(...)):
         )
 
     except FileNotFoundError as e:
-        # Model or class_names missing
         raise HTTPException(status_code=500, detail=f"Model files missing: {str(e)}")
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Prediction failed: {str(e)}")

@@ -1,10 +1,15 @@
+# main.py
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from app.api.v1.environment import router as environment_router
 from app.api.v1.growth import router as growth_router
 from app.api.v1.pests import router as pests_router
 from app.api.v1.disease import router as disease_router
+from app.api.v1.type import router as type_router
+
 
 app = FastAPI(
     title="Mushroom Project Backend",
@@ -29,9 +34,7 @@ class DummyInput(BaseModel):
 
 @app.get("/ping")
 def ping():
-    """
-    Simple health check endpoint.
-    """
+    """Simple health check endpoint."""
     return {"message": "Backend is working!"}
 
 
@@ -51,15 +54,13 @@ def predict(input_data: DummyInput):
 
 # --------- API v1 modular routers ---------
 
-# Group other team members’ endpoints
 app.include_router(
-    environment.router,
+    environment_router,
     prefix="/api/v1/environment",
     tags=["environment"],
 )
 
 app.include_router(
-    pests.router,
     growth_router,
     prefix="/api/v1/growth",
     tags=["growth"],
@@ -71,20 +72,14 @@ app.include_router(
     tags=["pests"],
 )
 
-# Your part: disease detection
 app.include_router(
-    disease.router,
+    disease_router,
     prefix="/api/v1/disease",
     tags=["disease"],
 )
 
 app.include_router(
-    growth.router,
-    prefix="/api/v1/growth",
-    tags=["growth"],
+    type_router,
+    prefix="/api/v1/type",
+    tags=["type"],
 )
-
-app.include_router(
-    type_router
-)
-

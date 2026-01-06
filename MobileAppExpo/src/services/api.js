@@ -1,39 +1,39 @@
 // src/services/api.js
 
+import { Platform } from "react-native";
+
 // Change this IP if your PC IP changes
-export const BACKEND_URL = 'http://192.168.1.10:8000';
+export const BACKEND_URL = "http://192.168.8.137:8000";
 
 export function getBackendUrl() {
   return BACKEND_URL;
 }
 
 export function buildUrl(path) {
-  // ensures path starts with /
   const p = path.startsWith("/") ? path : `/${path}`;
   return `${BACKEND_URL}${p}`;
 }
- 
+
 /**
  * GET /ping
  */
 export async function pingBackend() {
-  const response = await fetch(`${BACKEND_URL}/ping`);
+  const response = await fetch(buildUrl("/ping"));
   if (!response.ok) {
-    throw new Error('Bad response from /ping');
+    throw new Error("Bad response from /ping");
   }
   return response.json();
 }
 
 /**
- * POST /type/predict (Mushroom Type Classification)
+ * POST /api/v1/type/predict (Mushroom Type Classification)
  * Upload image using multipart/form-data
  */
 export async function predictMushroomType(imageUri) {
-  const url = buildUrl("/type/predict");
+  const url = buildUrl("/api/v1/type/predict");
 
   // WEB: need real File/Blob
   if (Platform.OS === "web") {
-    // imageUri will be a blob URL in web (like blob:http://localhost:8081/...)
     const imgRes = await fetch(imageUri);
     const blob = await imgRes.blob();
 
@@ -50,13 +50,14 @@ export async function predictMushroomType(imageUri) {
 
     const data = await response.json().catch(() => null);
     if (!response.ok) {
-      const msg = data?.detail || `Bad response from /type/predict (${response.status})`;
+      const msg =
+        data?.detail || `Bad response from /api/v1/type/predict (${response.status})`;
       throw new Error(msg);
     }
     return data;
   }
 
-  // MOBILE (Expo Go / Android / iOS): uri object works
+  // MOBILE (Expo Go / Android / iOS)
   const formData = new FormData();
   formData.append("file", {
     uri: imageUri,
@@ -68,21 +69,6 @@ export async function predictMushroomType(imageUri) {
     method: "POST",
     headers: {
       Accept: "application/json",
-// Send an image file to the backend and get disease prediction
-export async function predictDiseaseFromImage(imageUri) {
-  const formData = new FormData();
-
-  // React Native / Expo file object
-  formData.append('file', {
-    uri: imageUri,
-    name: 'mushroom.jpg',        // name can be anything
-    type: 'image/jpeg',          // or 'image/png' if you know it
-  });
-
-  const response = await fetch(`${BACKEND_URL}/api/v1/disease/predict`, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
       // Do NOT set 'Content-Type' here; RN will set correct multipart boundary
     },
     body: formData,
@@ -90,17 +76,44 @@ export async function predictDiseaseFromImage(imageUri) {
 
   const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const msg = data?.detail || `Bad response from /type/predict (${response.status})`;
+    const msg =
+      data?.detail || `Bad response from /api/v1/type/predict (${response.status})`;
     throw new Error(msg);
   }
 
   return data;
 }
+
+/**
+ * POST /api/v1/disease/predict (Disease Detection)
+ * Upload image using multipart/form-data
+ */
+export async function predictDiseaseFromImage(imageUri) {
+  const url = buildUrl("/api/v1/disease/predict");
+
+  const formData = new FormData();
+  formData.append("file", {
+    uri: imageUri,
+    name: "mushroom.jpg",
+    type: "image/jpeg",
+  });
+
+  const response = await fetch(url, {
+    method: "POST",
+    headers: {
+      Accept: "application/json",
+      // Do NOT set 'Content-Type' here; RN will set correct multipart boundary
+    },
+    body: formData,
+  });
+
+  const data = await response.json().catch(() => null);
   if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Backend error (${response.status}): ${text}`);
+    const msg =
+      data?.detail ||
+      `Bad response from /api/v1/disease/predict (${response.status})`;
+    throw new Error(msg);
   }
 
-  return response.json(); // { label, confidence }
+  return data;
 }
-
