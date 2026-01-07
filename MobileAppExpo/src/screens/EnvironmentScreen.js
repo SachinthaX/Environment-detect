@@ -35,17 +35,30 @@ import {
 } from '../services/environmentApi';
 
 const C = {
-  bg: '#070B16',
-  surface: 'rgba(255,255,255,0.05)',
-  surface2: 'rgba(255,255,255,0.08)',
-  border: 'rgba(255,255,255,0.10)',
-  text: 'rgba(255,255,255,0.92)',
-  muted: 'rgba(255,255,255,0.65)',
-  faint: 'rgba(255,255,255,0.45)',
-  ok: '#34D399',
-  bad: '#FB7185',
-  warn: '#F59E0B',
+  // App surfaces
+  bg: '#F3F6FB',
+  surface: '#FFFFFF',
+  surface2: '#F6F8FC',
+  border: 'rgba(15, 23, 42, 0.12)',
+
+  // Text
+  text: '#0F172A',
+  muted: 'rgba(15, 23, 42, 0.62)',
+  faint: 'rgba(15, 23, 42, 0.42)',
+
+  // Accents
+  primary: '#2563EB',
+
+  // Status colors
+  ok: '#16A34A',
+  bad: '#E11D48',
+  warn: '#D97706',
+
+  // Chart helpers
+  chartAxis: 'rgba(15, 23, 42, 0.20)',
+  chartTick: 'rgba(15, 23, 42, 0.55)',
 };
+
 
 function ymdLocal(d = new Date()) {
   const yyyy = d.getFullYear();
@@ -65,12 +78,23 @@ function Chip({ tone = 'muted', text }) {
   const color =
     tone === 'ok' ? C.ok : tone === 'bad' ? C.bad : tone === 'warn' ? C.warn : C.muted;
 
+  // light filled background (works great on white UI)
+  const bg =
+    tone === 'ok'
+      ? 'rgba(22, 163, 74, 0.12)'
+      : tone === 'bad'
+      ? 'rgba(225, 29, 72, 0.12)'
+      : tone === 'warn'
+      ? 'rgba(217, 119, 6, 0.12)'
+      : 'rgba(15, 23, 42, 0.06)';
+
   return (
-    <View style={[styles.chip, { borderColor: color }]}>
+    <View style={[styles.chip, { borderColor: color, backgroundColor: bg }]}>
       <Text style={[styles.chipText, { color }]}>{text}</Text>
     </View>
   );
 }
+
 
 
 function Card({ title, right, children }) {
@@ -110,9 +134,10 @@ function StatTile({ label, value, unit, status, subtitle }) {
 
 function AlertRow({ title, message, rightText, severity = 'bad' }) {
   const isWarn = severity === 'warn';
-  const tintBg = isWarn ? 'rgba(245,158,11,0.10)' : 'rgba(251,113,133,0.10)';
-  const tintBorder = isWarn ? 'rgba(245,158,11,0.22)' : 'rgba(251,113,133,0.22)';
+  const tintBg = isWarn ? 'rgba(217, 119, 6, 0.10)' : 'rgba(225, 29, 72, 0.10)';
+  const tintBorder = isWarn ? 'rgba(217, 119, 6, 0.22)' : 'rgba(225, 29, 72, 0.22)';
   const dotColor = isWarn ? C.warn : C.bad;
+
 
   return (
     <View style={[styles.alertBanner, { backgroundColor: tintBg, borderColor: tintBorder }]}>
@@ -203,7 +228,7 @@ function SimpleLineChart({
   };
 
   const { linePath, areaPaths, plotW, plotH } = useMemo(() => {
-    if (!width || !points || points.length < 2) {
+    if (!width) {
       return { linePath: '', areaPaths: [], plotW: 0, plotH: 0 };
     }
 
@@ -212,8 +237,12 @@ function SimpleLineChart({
 
     const pw = Math.max(10, w - paddingLeft - paddingRight);
     const ph = Math.max(10, h - paddingTop - paddingBottom);
+    const bY = paddingTop + ph;
 
-    const baseY = paddingTop + ph; // yMin baseline
+    // Important: even if points < 2, still return plotW/plotH so axes show
+    if (!points || points.length < 2) {
+      return { linePath: '', areaPaths: [], plotW: pw, plotH: ph, baseY: bY };
+    }
 
     const scaleX = (i) => paddingLeft + (i / (points.length - 1)) * pw;
 
@@ -223,18 +252,15 @@ function SimpleLineChart({
       return paddingTop + (1 - t) * ph;
     };
 
-    // Build the line path (your original logic)
     let lp = '';
     let started = false;
 
-    // Also build area segments for gradient fill
     const segments = [];
     let current = [];
 
     for (let i = 0; i < points.length; i++) {
       const p = points[i];
       const v = p?.[field];
-
       const x = scaleX(i);
 
       if (v === null || v === undefined) {
@@ -246,7 +272,6 @@ function SimpleLineChart({
 
       const y = scaleY(Number(v));
 
-      // Line path
       if (!started) {
         lp += `M ${x.toFixed(2)} ${y.toFixed(2)} `;
         started = true;
@@ -254,13 +279,11 @@ function SimpleLineChart({
         lp += `L ${x.toFixed(2)} ${y.toFixed(2)} `;
       }
 
-      // Area segment point
       current.push({ x, y });
     }
 
     if (current.length >= 2) segments.push(current);
 
-    // Convert segments -> closed area paths
     const ap = segments.map((seg) => {
       const first = seg[0];
       const last = seg[seg.length - 1];
@@ -270,13 +293,12 @@ function SimpleLineChart({
         d += `L ${seg[i].x.toFixed(2)} ${seg[i].y.toFixed(2)} `;
       }
 
-      // close down to baseline
-      d += `L ${last.x.toFixed(2)} ${baseY.toFixed(2)} `;
-      d += `L ${first.x.toFixed(2)} ${baseY.toFixed(2)} Z`;
+      d += `L ${last.x.toFixed(2)} ${bY.toFixed(2)} `;
+      d += `L ${first.x.toFixed(2)} ${bY.toFixed(2)} Z`;
       return d;
     });
 
-    return { linePath: lp.trim(), areaPaths: ap, plotW: pw, plotH: ph };
+    return { linePath: lp.trim(), areaPaths: ap, plotW: pw, plotH: ph, baseY: bY };
   }, [
     width,
     height,
@@ -293,27 +315,23 @@ function SimpleLineChart({
   const gradientId = `areaGrad_${field}`;
 
   return (
-    <View
-      onLayout={(e) => setWidth(e.nativeEvent.layout.width)}
-      style={{ width: '100%', height }}
-    >
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ width: '100%', height }}>
       {width > 0 ? (
         <Svg width={width} height={height}>
           <Defs>
             <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
-              <Stop offset="0%" stopColor="rgba(255,255,255,0.35)" stopOpacity="0.16" />
-              <Stop offset="55%" stopColor="rgba(255,255,255,0.20)" stopOpacity="0.08" />
-              <Stop offset="100%" stopColor="rgba(255,255,255,0.10)" stopOpacity="0.02" />
+              <Stop offset="0%" stopColor={C.primary} stopOpacity="0.28" />
+              <Stop offset="60%" stopColor={C.primary} stopOpacity="0.12" />
+              <Stop offset="100%" stopColor={C.primary} stopOpacity="0.00" />
             </LinearGradient>
           </Defs>
 
-          {/* Axes */}
           <Line
             x1={paddingLeft}
             y1={paddingTop}
             x2={paddingLeft}
             y2={paddingTop + plotH}
-            stroke="rgba(255,255,255,0.18)"
+            stroke={C.chartAxis}
             strokeWidth="1"
           />
           <Line
@@ -321,9 +339,10 @@ function SimpleLineChart({
             y1={paddingTop + plotH}
             x2={paddingLeft + plotW}
             y2={paddingTop + plotH}
-            stroke="rgba(255,255,255,0.18)"
+            stroke={C.chartAxis}
             strokeWidth="1"
           />
+
 
           {/* Y ticks */}
           {computedYTicks.map((tickVal, idx) => {
@@ -337,14 +356,14 @@ function SimpleLineChart({
                   y1={y}
                   x2={paddingLeft}
                   y2={y}
-                  stroke="rgba(255,255,255,0.22)"
+                  stroke={C.chartAxis}
                   strokeWidth="1"
                 />
                 <SvgText
                   x={paddingLeft - 8}
                   y={y + 3}
                   fontSize="10"
-                  fill="rgba(255,255,255,0.55)"
+                  fill={C.chartTick}
                   textAnchor="end"
                 >
                   {Number(tickVal).toFixed(0)}
@@ -355,7 +374,8 @@ function SimpleLineChart({
 
           {/* X ticks */}
           {xTickIndices.map((i) => {
-            const x = paddingLeft + (i / (n - 1)) * plotW;
+            const denom = Math.max(1, n - 1);
+            const x = paddingLeft + (i / denom) * plotW;
             const label = fmtTime(points?.[i]?.ts);
 
             return (
@@ -365,14 +385,14 @@ function SimpleLineChart({
                   y1={paddingTop + plotH}
                   x2={x}
                   y2={paddingTop + plotH + 4}
-                  stroke="rgba(255,255,255,0.22)"
+                  stroke={C.chartAxis}
                   strokeWidth="1"
                 />
                 <SvgText
                   x={x}
                   y={paddingTop + plotH + 16}
                   fontSize="10"
-                  fill="rgba(255,255,255,0.55)"
+                  fill={C.chartTick}
                   textAnchor="middle"
                 >
                   {label}
@@ -381,14 +401,14 @@ function SimpleLineChart({
             );
           })}
 
-          {/* Gradient fill area */}
+          {/* Gradient fill */}
           {areaPaths.map((d, idx) => (
             <Path key={`area-${idx}`} d={d} fill={`url(#${gradientId})`} stroke="none" />
           ))}
 
-          {/* Line path */}
+          {/* Line */}
           {linePath ? (
-            <Path d={linePath} stroke="rgba(255,255,255,0.90)" strokeWidth="2" fill="none" />
+            <Path d={linePath} stroke={C.primary} strokeWidth="2.5" fill="none" />
           ) : null}
         </Svg>
       ) : null}
@@ -412,11 +432,15 @@ export default function EnvironmentScreen() {
   const [profile, setProfile] = useState({ mushroom_type: null, stage: null });
   const [range, setRange] = useState(null);
 
+  const [recRangeCache, setRecRangeCache] = useState({});
+
   const [showMushroomModal, setShowMushroomModal] = useState(false);
   const [showStageModal, setShowStageModal] = useState(false);
 
   const timerRef = useRef(null);
   const historyTimerRef = useRef(null);
+
+
 
   // Graphs: last_1h | date (only)
   const [graphMode, setGraphMode] = useState('last_1h');
@@ -433,6 +457,14 @@ export default function EnvironmentScreen() {
   
   const [recExpandedKey, setRecExpandedKey] = useState(null);
   const [showAllRecs, setShowAllRecs] = useState(false);
+
+  const graphModeRef = useRef(graphMode);
+  const selectedDateRef = useRef(selectedDate);
+
+  useEffect(() => {
+    graphModeRef.current = graphMode;
+    selectedDateRef.current = selectedDate;
+  }, [graphMode, selectedDate]);
 
   const stageItems = useMemo(
     () => (options.stages || []).map((s) => ({ key: s.key, label: s.label })),
@@ -498,6 +530,43 @@ export default function EnvironmentScreen() {
     return parts.length ? parts.join(' • ') : '—';
   }, [health?.seconds_since_last, profile.mushroom_type, stageLabel]);
 
+
+  function recCacheKey(mushroomType) {
+    return `${mushroomType}__${profile.stage || 'no_stage'}`;
+  }
+
+
+  // Fetch optimal range for the mushroom user expanded (and cache it)
+  async function ensureRecRangeLoaded(mushroomType) {
+    // We need stage to fetch correct optimal range
+    if (!profile.stage) return;
+
+    const key = recCacheKey(mushroomType);
+
+    // if already in cache (loading/range/error), don’t refetch
+    const existing = recRangeCache[key];
+    if (existing?.loading || existing?.range || existing?.error) return;
+
+    setRecRangeCache((prev) => ({
+      ...prev,
+      [key]: { loading: true, range: null, error: false },
+    }));
+
+    try {
+      const rg = await fetchOptimalRange(mushroomType, profile.stage);
+      setRecRangeCache((prev) => ({
+        ...prev,
+        [key]: { loading: false, range: rg, error: false },
+      }));
+    } catch {
+      setRecRangeCache((prev) => ({
+        ...prev,
+        [key]: { loading: false, range: null, error: true },
+      }));
+    }
+  }
+
+
   function deltaText(value, min, max, unit, decimals = 1) {
     if (value == null || min == null || max == null) return null;
     const v = Number(value);
@@ -526,6 +595,7 @@ export default function EnvironmentScreen() {
 
       setRecExpandedKey(null);
       setShowAllRecs(false);
+      setRecRangeCache({});
     } catch {
       setRecommendation(null);
     } finally {
@@ -621,6 +691,8 @@ export default function EnvironmentScreen() {
     const saved = await updateEnvironmentProfile(next);
     const nextProfile = { mushroom_type: saved.mushroom_type, stage: saved.stage };
     setProfile(nextProfile);
+    setRecExpandedKey(null);
+    setRecRangeCache({});
 
     prevAlertActiveRef.current = { temperature: false, humidity: false };
     setAlerts([]);
@@ -640,8 +712,9 @@ export default function EnvironmentScreen() {
     }, 5000);
 
     historyTimerRef.current = setInterval(() => {
-      refreshHistory(graphMode, selectedDate);
+      refreshHistory(graphModeRef.current, selectedDateRef.current);
     }, 30000);
+
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -696,7 +769,8 @@ export default function EnvironmentScreen() {
       <ScrollView
         style={styles.container}
         contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={true}
+        
       >
         <View style={styles.header}>
           
@@ -870,7 +944,10 @@ export default function EnvironmentScreen() {
               style={[styles.segmentBtn, graphMode === 'last_1h' && styles.segmentBtnActive]}
               onPress={() => setGraphMode('last_1h')}
             >
-              <Text style={styles.segmentText}>Last 1h</Text>
+              <Text style={[styles.segmentText, graphMode === 'last_1h' && styles.segmentTextActive]}>
+                Last 1h
+              </Text>
+
             </Pressable>
 
             <Pressable
@@ -889,8 +966,13 @@ export default function EnvironmentScreen() {
                 setShowDateModal(true);
               }}
             >
-              <Text style={styles.segmentText}>Date</Text>
-              <Text style={styles.segmentSub}>{dateForButtons}</Text>
+              <Text style={[styles.segmentText, graphMode === 'date' && styles.segmentTextActive]}>
+                Date
+              </Text>
+              <Text style={[styles.segmentSub, graphMode === 'date' && styles.segmentSubActive]}>
+                {dateForButtons}
+              </Text>
+
             </Pressable>
           </View>
 
@@ -918,14 +1000,21 @@ export default function EnvironmentScreen() {
               style={[styles.segmentBtn, recSource === 'current' && styles.segmentBtnActive]}
               onPress={() => setRecSource('current')}
             >
-              <Text style={styles.segmentText}>Current</Text>
+              <Text style={[styles.segmentText, recSource === 'current' && styles.segmentTextActive]}>
+                Current
+              </Text>
+
             </Pressable>
 
             <Pressable
               style={[styles.segmentBtn, recSource === 'last_1h' && styles.segmentBtnActive]}
               onPress={() => setRecSource('last_1h')}
             >
-              <Text style={styles.segmentText}>Last 1h</Text>
+              <Text style={[styles.segmentText, recSource === 'last_1h' && styles.segmentTextActive]}>
+                Last 1h
+              </Text>
+
+
             </Pressable>
 
             <Pressable
@@ -944,8 +1033,14 @@ export default function EnvironmentScreen() {
                 setShowRecDateModal(true);
               }}
             >
-              <Text style={styles.segmentText}>Date</Text>
-              <Text style={styles.segmentSub}>{dateForButtons}</Text>
+              <Text style={[styles.segmentText, recSource === 'date' && styles.segmentTextActive]}>
+                Date
+              </Text>
+              <Text style={[styles.segmentSub, recSource === 'date' && styles.segmentSubActive]}>
+                {dateForButtons}
+              </Text>
+
+
             </Pressable>
           </View>
 
@@ -983,7 +1078,14 @@ export default function EnvironmentScreen() {
                   return (
                     <Pressable
                       key={key}
-                      onPress={() => setRecExpandedKey(expanded ? null : key)}
+                      onPress={() => {
+                        const next = expanded ? null : key;
+                        setRecExpandedKey(next);
+
+                        // when expanding, fetch target range for that mushroom
+                        if (!expanded) ensureRecRangeLoaded(r.mushroom_type);
+                      }}
+
                       style={[styles.recItem, expanded && styles.recItemExpanded]}
                     >
                       <View style={styles.recTopRow}>
@@ -1003,6 +1105,7 @@ export default function EnvironmentScreen() {
                         </Text>
                       ) : (
                         <View style={styles.recDetails}>
+                          {/* Keep your current reason lines */}
                           {parts.length > 0 ? (
                             parts.map((p, i) => (
                               <Text key={i} style={styles.recDetailText}>
@@ -1012,7 +1115,73 @@ export default function EnvironmentScreen() {
                           ) : (
                             <Text style={styles.recDetailText}>No details available</Text>
                           )}
+
+                          {/* New extra info section */}
+                          <View style={{ marginTop: 10 }}>
+                            {!profile.stage ? (
+                              <Text style={styles.recDetailText}>Select a stage to show target ranges.</Text>
+                            ) : (() => {
+                              const key2 = recCacheKey(r.mushroom_type);
+                              const cache = recRangeCache[key2];
+                              const rg = cache?.range;
+
+                              // Use the data that produced recommendation
+                              const usedT = recommendation?.temperature;
+                              const usedH = recommendation?.humidity;
+
+                              if (cache?.loading) {
+                                return <Text style={styles.recDetailText}>Loading target ranges...</Text>;
+                              }
+
+                              if (cache?.error) {
+                                return <Text style={styles.recDetailText}>Could not load target ranges.</Text>;
+                              }
+
+                              if (!rg) return null;
+
+                              
+                              // CO2 label if present
+                              const hasCo2Min = rg.co2_min != null && Number.isFinite(Number(rg.co2_min));
+                              const hasCo2Max = rg.co2_max != null && Number.isFinite(Number(rg.co2_max));
+                              const co2Label =
+                                hasCo2Min && hasCo2Max
+                                  ? `${Number(rg.co2_min)}–${Number(rg.co2_max)} ppm`
+                                  : hasCo2Max
+                                  ? `≤ ${Number(rg.co2_max)} ppm`
+                                  : hasCo2Min
+                                  ? `≥ ${Number(rg.co2_min)} ppm`
+                                  : null;
+
+                              return (
+                                <>
+                                  <Text style={[styles.recDetailText, { fontWeight: '900', color: C.text }]}>
+                                    Target ranges ({stageLabel || profile.stage})
+                                  </Text>
+
+                                  <Text style={styles.recDetailText}>
+                                    Temp target: {rg.temp_min}–{rg.temp_max}°C
+                                    {usedT != null ? ` • Used: ${Number(usedT).toFixed(1)}°C` : ''}
+                                  </Text>
+
+                                  <Text style={styles.recDetailText}>
+                                    RH target: {rg.rh_min}–{rg.rh_max}%
+                                    {usedH != null ? ` • Used: ${Number(usedH).toFixed(1)}%` : ''}
+                                  </Text>
+
+                                  {co2Label ? (
+                                    <Text style={styles.recDetailText}>
+                                      CO₂ target: {co2Label}
+                                    </Text>
+                                  ) : null}
+
+                                  {/* removed rg.co2_note to avoid showing "estimated only (display)" */}
+                                </>
+                              );
+
+                            })()}
+                          </View>
                         </View>
+
                       )}
                     </Pressable>
                   );
@@ -1092,13 +1261,12 @@ export default function EnvironmentScreen() {
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: C.bg },
   container: { flex: 1, paddingHorizontal: 16, paddingVertical: 16 },
-  scrollContent: { paddingBottom: 120 },
+  scrollContent: { paddingBottom: 32 },
 
   loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 10 },
 
   header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  headerTitle: { fontSize: 28, fontWeight: '800', color: C.text, letterSpacing: 0.2 },
-  headerSub: { marginTop: 6, color: C.muted, fontSize: 13 },
+  headerSub: { marginTop: 10, color: C.muted, fontSize: 13 },
 
   subtle: { color: C.muted, marginTop: 10, fontSize: 12 },
 
@@ -1109,95 +1277,16 @@ const styles = StyleSheet.create({
     marginTop: 14,
     borderWidth: 1,
     borderColor: C.border,
-    shadowColor: '#000',
-    shadowOpacity: 0.22,
-    shadowRadius: 12,
-    shadowOffset: { width: 0, height: 8 },
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 6 },
     elevation: 2,
   },
   cardHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 },
   cardTitle: { color: C.text, fontWeight: '800', fontSize: 16 },
 
   sectionTitle: { color: C.text, fontWeight: '800', marginBottom: 8 },
-
-  recRightGroup: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  recChevron: {
-    color: C.faint,
-    fontSize: 14,
-    fontWeight: '900',
-  },
-
-
-  recItem: {
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: 'rgba(255,255,255,0.04)',
-    borderRadius: 14,
-    padding: 12,
-    marginBottom: 10,
-  },
-  recItemExpanded: {
-    backgroundColor: 'rgba(255,255,255,0.06)',
-    borderColor: 'rgba(255,255,255,0.16)',
-  },
-  recTopRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
-  },
-  recHint: {
-    color: C.muted,
-    marginTop: 6,
-    fontSize: 12,
-    lineHeight: 16,
-  },
-  recTapText: {
-    color: C.faint,
-    marginTop: 8,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  recDetails: {
-    marginTop: 10,
-    paddingTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: C.border,
-  },
-  recDetailText: {
-    color: C.muted,
-    fontSize: 12,
-    lineHeight: 18,
-    marginTop: 4,
-  },
-  showMoreBtn: {
-    alignSelf: 'flex-start',
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: 'rgba(0,0,0,0.10)',
-    marginTop: 2,
-  },
-  showMoreText: {
-    color: C.text,
-    fontWeight: '900',
-    fontSize: 12,
-  },
-
-  toggleBtnActive: {
-    backgroundColor: 'rgba(255,255,255,0.10)',
-    borderColor: 'rgba(255,255,255,0.22)',
-  },
-  toggleTextActive: {
-    color: '#ffffff',
-  },
-
 
   chip: {
     flexDirection: 'row',
@@ -1206,7 +1295,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingVertical: 5,
     paddingHorizontal: 10,
-    backgroundColor: 'rgba(0,0,0,0.10)',
+    backgroundColor: 'transparent',
   },
 
   chipText: { fontSize: 12, fontWeight: '800' },
@@ -1241,13 +1330,9 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     marginTop: 4,
   },
-  
   alertTitle: { color: C.text, fontSize: 14, fontWeight: '900' },
   alertMsg: { color: C.muted, fontSize: 13, marginTop: 2 },
   alertRight: { fontSize: 13, fontWeight: '900', marginLeft: 8 },
-
-  alertRow: { flexDirection: 'row', gap: 10, paddingVertical: 10 },
-  
 
   rowBetween: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   label: { color: C.muted, fontWeight: '700' },
@@ -1258,7 +1343,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: C.border,
-    backgroundColor: 'rgba(0,0,0,0.16)',
+    backgroundColor: '#FFFFFF',
     maxWidth: 220,
   },
   selectBtnText: { color: C.text, fontWeight: '800' },
@@ -1271,7 +1356,6 @@ const styles = StyleSheet.create({
   optMid: { flex: 1, color: C.text, fontWeight: '800' },
   optMuted: { color: C.muted, fontWeight: '700' },
   optRight: { minWidth: 54, textAlign: 'right', color: C.muted, fontWeight: '900' },
-  optHint: { marginTop: 6, color: C.muted, fontSize: 12 },
 
   segmentWrap: {
     flexDirection: 'row',
@@ -1284,43 +1368,69 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     borderWidth: 1,
     borderColor: C.border,
-    backgroundColor: 'rgba(0,0,0,0.12)',
+    backgroundColor: C.surface,
     alignItems: 'center',
   },
   segmentBtnActive: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
-    borderColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(37, 99, 235, 0.10)',
+    borderColor: 'rgba(37, 99, 235, 0.28)',
   },
   segmentText: { color: C.text, fontWeight: '900' },
+  segmentTextActive: { color: C.primary },
   segmentSub: { color: C.muted, fontSize: 11, marginTop: 2, fontWeight: '800' },
+  segmentSubActive: { color: 'rgba(37, 99, 235, 0.85)' },
+
 
   primaryBtn: {
     marginTop: 12,
     paddingVertical: 12,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: C.border,
-    backgroundColor: 'rgba(0,0,0,0.14)',
+    borderColor: 'rgba(37, 99, 235, 0.28)',
+    backgroundColor: 'rgba(37, 99, 235, 0.10)',
     alignItems: 'center',
   },
-  primaryBtnText: { color: C.text, fontWeight: '900' },
+  primaryBtnText: { color: C.primary, fontWeight: '900' },
 
-  recRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    paddingVertical: 10,
-    borderBottomWidth: 1,
-    borderBottomColor: C.border,
-    gap: 10,
+
+  recRightGroup: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  recChevron: { color: C.faint, fontSize: 14, fontWeight: '900' },
+
+  recItem: {
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 10,
   },
+  recItemExpanded: {
+    backgroundColor: 'rgba(37, 99, 235, 0.06)',
+    borderColor: 'rgba(37, 99, 235, 0.22)',
+  },
+  recTopRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
+  recHint: { color: C.muted, marginTop: 6, fontSize: 12, lineHeight: 16 },
+  recDetails: { marginTop: 10, paddingTop: 10, borderTopWidth: 1, borderTopColor: C.border },
+  recDetailText: { color: C.muted, fontSize: 12, lineHeight: 18, marginTop: 4 },
+
+  showMoreBtn: {
+    alignSelf: 'flex-start',
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: C.border,
+    backgroundColor: '#FFFFFF',
+    marginTop: 2,
+  },
+  showMoreText: { color: C.text, fontWeight: '900', fontSize: 12 },
+
   recTitle: { color: C.text, fontWeight: '900' },
-  recReason: { color: C.muted, marginTop: 4, fontSize: 12 },
   recScore: { color: C.text, fontWeight: '900', minWidth: 60, textAlign: 'right' },
 
   modalBackdrop: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.65)',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
     alignItems: 'center',
     justifyContent: 'center',
     padding: 16,
@@ -1328,7 +1438,7 @@ const styles = StyleSheet.create({
   modalCard: {
     width: '100%',
     maxWidth: 420,
-    backgroundColor: '#0B1020',
+    backgroundColor: '#FFFFFF',
     borderRadius: 18,
     padding: 14,
     borderWidth: 1,
@@ -1343,10 +1453,11 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingVertical: 10,
     borderRadius: 14,
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
     borderWidth: 1,
     borderColor: C.border,
   },
   modalCloseText: { color: C.text, fontWeight: '900' },
 });
+
