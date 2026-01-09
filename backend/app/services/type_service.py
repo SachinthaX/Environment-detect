@@ -10,14 +10,18 @@ import json
 import numpy as np
 from PIL import Image
 
-# Windows-friendly: TensorFlow already provides TFLite Interpreter
+# Windows-friendly: TensorFlow provides TFLite Interpreter
 from tensorflow.lite.python.interpreter import Interpreter  # type: ignore
 
 
 ALLOWED_CONTENT_TYPES = {"image/jpeg", "image/png", "image/jpg", "image/webp"}
 
-# Confidence threshold for "unknown"
-CONFIDENCE_THRESHOLD = 0.70
+# ---- Tunable thresholds ----
+# Suggestion: start with these, then adjust after testing
+CONFIDENCE_THRESHOLD = 0.90   # if top-1 confidence below -> unknown
+MARGIN_THRESHOLD = 0.20       # if top-1 - top-2 below -> unknown
+ENTROPY_THRESHOLD = 0.90      # high uncertainty -> unknown (for 3 classes max entropy ~1.0986)
+
 TOP_K = 3
 IMG_SIZE = (224, 224)
 
@@ -37,7 +41,7 @@ _class_names: Optional[List[str]] = None
 
 
 def _load_model_once() -> None:
-    """Loads TFLite model + class names once (singleton)."""
+    """Load TFLite model + class names once (singleton)."""
     global _interpreter, _input_index, _output_index, _class_names
 
     if _interpreter is not None and _class_names is not None:
@@ -54,6 +58,8 @@ def _load_model_once() -> None:
 
     if not isinstance(_class_names, list) or len(_class_names) == 0:
         raise ValueError("class_names.json must be a non-empty list of strings.")
+    if not all(isinstance(x, str) for x in _class_names):
+        raise ValueError("class_names.json must contain only strings.")
 
     _interpreter = Interpreter(model_path=str(TFLITE_PATH))
     _interpreter.allocate_tensors()
@@ -66,13 +72,13 @@ def _load_model_once() -> None:
 
 
 def _read_image(file_bytes: bytes) -> Image.Image:
-    """Read bytes -> PIL image RGB."""
+    """Read bytes -> PIL RGB image."""
     return Image.open(BytesIO(file_bytes)).convert("RGB")
 
 
 def _preprocess(img: Image.Image) -> np.ndarray:
     """
-    Preprocess for MobileNetV2:
+    MobileNetV2 preprocessing:
     - resize 224x224
     - float32
     - scale to [-1, 1]  => (x / 127.5) - 1
@@ -90,10 +96,10 @@ def _image_quality_flags(input_tensor: np.ndarray) -> Tuple[bool, Optional[str]]
     Simple quality detection:
     - Too dark
     - Too bright
-    - Too low contrast
-    input_tensor expected in [-1, 1]. We'll convert to [0, 1] for checks.
+    - Too low contrast (often unclear)
+    input_tensor expected in [-1, 1]; convert to [0, 1] for checks.
     """
-    x = (input_tensor[0] + 1.0) / 2.0  # (224,224,3) in [0,1]
+    x = (input_tensor[0] + 1.0) / 2.0  # [0,1]
     gray = np.mean(x, axis=2)
 
     mean_val = float(np.mean(gray))
@@ -108,8 +114,48 @@ def _image_quality_flags(input_tensor: np.ndarray) -> Tuple[bool, Optional[str]]
     return False, None
 
 
+def _softmax(x: np.ndarray) -> np.ndarray:
+    x = x.astype(np.float32)
+    x = x - np.max(x)  # stability
+    ex = np.exp(x)
+    s = float(np.sum(ex))
+    if s <= 0:
+        return np.ones_like(x, dtype=np.float32) / max(len(x), 1)
+    return ex / s
+
+
+def _to_probabilities(raw: np.ndarray) -> np.ndarray:
+    """
+    Convert model output to probabilities safely.
+    Handles:
+    - already probabilities (sum ~ 1, all >= 0)
+    - logits (can contain negatives / sum not 1)
+    """
+    v = raw.astype(np.float32).reshape(-1)
+
+    # If any negative value exists, it's very likely logits
+    if np.any(v < 0):
+        return _softmax(v)
+
+    s = float(np.sum(v))
+    # If sum is close to 1 and values are non-negative -> already probabilities
+    if 0.98 <= s <= 1.02:
+        # Clip and renormalize just in case
+        v = np.clip(v, 1e-9, 1.0)
+        return v / float(np.sum(v))
+
+    # Otherwise could still be logits (e.g., not negative but not normalized)
+    # Try softmax if values are not in [0,1] or sum is weird.
+    if np.max(v) > 1.0 or s <= 0:
+        return _softmax(v)
+
+    # Fallback: normalize (for safety)
+    v = np.clip(v, 1e-9, 1.0)
+    return v / float(np.sum(v))
+
+
 def _tflite_predict(input_tensor: np.ndarray) -> np.ndarray:
-    """Runs TFLite inference and returns probabilities (num_classes,)."""
+    """Run TFLite inference and return probabilities (num_classes,)."""
     _load_model_once()
     assert _interpreter is not None
     assert _input_index is not None
@@ -119,12 +165,16 @@ def _tflite_predict(input_tensor: np.ndarray) -> np.ndarray:
     _interpreter.invoke()
     out = _interpreter.get_tensor(_output_index)
 
-    probs = out[0].astype(np.float32)
-
-    s = float(np.sum(probs))
-    if s > 0:
-        probs = probs / s
+    # out usually (1, num_classes)
+    raw = out[0]
+    probs = _to_probabilities(raw)
     return probs
+
+
+def _entropy(probs: np.ndarray) -> float:
+    """Shannon entropy of probability vector."""
+    p = np.clip(probs.astype(np.float32), 1e-9, 1.0)
+    return float(-np.sum(p * np.log(p)))
 
 
 def predict_type(
@@ -144,28 +194,37 @@ def predict_type(
     if len(probs) != len(_class_names):
         raise ValueError(
             f"Model output classes ({len(probs)}) != class_names ({len(_class_names)}). "
-            "Check class_names.json order and model."
+            "Fix: export class_names.json from the SAME training run as the tflite model."
         )
 
     idx_sorted = np.argsort(probs)[::-1]
     top_k = [(_class_names[i], float(probs[i])) for i in idx_sorted[:TOP_K]]
 
     best_label, best_conf = top_k[0]
+    second_conf = top_k[1][1] if len(top_k) > 1 else 0.0
 
-    if bad_quality or best_conf < CONFIDENCE_THRESHOLD:
-        return (
-            False,
-            "unknown",
-            best_conf,
-            top_k,
-            quality_msg or "Not confident. Please upload a clear mushroom image."
-        )
+    ent = _entropy(probs)
+    margin = float(best_conf - second_conf)
 
-    return True, best_label, best_conf, top_k, None
+    # Unknown conditions
+    if (
+        bad_quality
+        or best_conf < CONFIDENCE_THRESHOLD
+        or margin < MARGIN_THRESHOLD
+        or ent > ENTROPY_THRESHOLD
+    ):
+        msg = quality_msg or "Not confident (maybe not a mushroom). Please upload a clear mushroom image."
+        # IMPORTANT: you wanted no top predictions when unknown
+        return (False, "unknown", float(best_conf), [], msg)
+
+    return True, best_label, float(best_conf), top_k, None
 
 
 def predict_type_response(file_bytes: bytes) -> Dict[str, Any]:
-    """JSON helper matching frontend expectation."""
+    """
+    JSON helper matching frontend expectation:
+      { ok, label, confidence, top_k:[{label, confidence}], message }
+    """
     ok, label, conf, top_k, msg = predict_type(file_bytes)
     return {
         "ok": ok,

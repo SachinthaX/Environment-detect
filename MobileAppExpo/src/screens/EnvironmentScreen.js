@@ -440,6 +440,7 @@ export default function EnvironmentScreen() {
   const timerRef = useRef(null);
   const historyTimerRef = useRef(null);
 
+  const [profileUpdating, setProfileUpdating] = useState(false);
 
 
   // Graphs: last_1h | date (only)
@@ -688,20 +689,37 @@ export default function EnvironmentScreen() {
   }
 
   async function applyProfile(next) {
-    const saved = await updateEnvironmentProfile(next);
-    const nextProfile = { mushroom_type: saved.mushroom_type, stage: saved.stage };
-    setProfile(nextProfile);
-    setRecExpandedKey(null);
-    setRecRangeCache({});
+    setProfileUpdating(true);
 
-    prevAlertActiveRef.current = { temperature: false, humidity: false };
-    setAlerts([]);
+    try {
+      const saved = await updateEnvironmentProfile(next);
+      const nextProfile = { mushroom_type: saved.mushroom_type, stage: saved.stage };
+      setProfile(nextProfile);
 
-    const rg = await fetchOptimalRange(nextProfile.mushroom_type, nextProfile.stage);
-    setRange(rg);
+      // DO NOT: setAlerts([])  -> this is what causes the “jump”
+      // DO NOT: immediately shrink the UI
 
-    refreshStatus();
+      // Get new optimal range
+      const rg = await fetchOptimalRange(nextProfile.mushroom_type, nextProfile.stage);
+      setRange(rg);
+
+      // Now fetch new status and replace reading + alerts in one shot
+      const st = await fetchEnvironmentStatus();
+      setReading(st.reading ?? null);
+      setAlerts(st.alerts || []);
+      if (st.optimal_range) setRange(st.optimal_range);
+
+      // Reset tracking AFTER we have new alerts (optional)
+      const nextPrev = { temperature: false, humidity: false };
+      for (const a of st.alerts || []) nextPrev[a.param] = !!a.active;
+      prevAlertActiveRef.current = nextPrev;
+    } catch (_e) {
+      // optional: show something / keep old alerts
+    } finally {
+      setProfileUpdating(false);
+    }
   }
+
 
   useEffect(() => {
     loadInitial();
@@ -815,7 +833,15 @@ export default function EnvironmentScreen() {
           />
         </Card>
 
-        <Card title="Alerts">
+        <Card
+          title="Alerts"
+          right={profileUpdating ? <Chip tone="warn" text="Updating..." /> : null}
+        >
+        {profileUpdating ? (
+          <Text style={styles.subtle}>Refreshing alerts for the selected mushroom type...</Text>
+        ) : null}
+
+
           {activeAlerts.length > 0 ? (
             <View style={{ marginTop: 2 }}>
               {activeAlerts.map((a) => {

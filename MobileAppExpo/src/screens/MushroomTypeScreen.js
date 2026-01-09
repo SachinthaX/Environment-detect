@@ -29,14 +29,14 @@ export default function MushroomTypeScreen() {
   const [result, setResult] = useState(null);
   const [error, setError] = useState("");
 
+  // Disable predict if server not connected
   const canPredict = useMemo(
-    () => !!imageUri && !loadingPredict,
-    [imageUri, loadingPredict]
+    () => !!imageUri && !loadingPredict && serverOk,
+    [imageUri, loadingPredict, serverOk]
   );
 
   useEffect(() => {
     doPing();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doPing = async () => {
@@ -44,10 +44,10 @@ export default function MushroomTypeScreen() {
     setError("");
 
     try {
-      const data = await pingBackend(); // FIXED: was pingServer()
+      const data = await pingBackend();
       setServerOk(true);
       setServerMsg(data?.message || "pong");
-    } catch (e) {
+    } catch (_e) {
       setServerOk(false);
       setServerMsg("");
       setError("Server not reachable. (Ping failed)");
@@ -94,6 +94,10 @@ export default function MushroomTypeScreen() {
   };
 
   const runPrediction = async () => {
+    if (!serverOk) {
+      setError("Backend is not connected. Please recheck.");
+      return;
+    }
     if (!imageUri) {
       setError("Please select an image first.");
       return;
@@ -107,7 +111,7 @@ export default function MushroomTypeScreen() {
       setResult(data);
     } catch (e) {
       setResult(null);
-      setError(e.message || "Prediction failed");
+      setError(e?.message || "Prediction failed");
     } finally {
       setLoadingPredict(false);
     }
@@ -188,6 +192,12 @@ export default function MushroomTypeScreen() {
           </Text>
         </Pressable>
 
+        {!serverOk ? (
+          <Text style={styles.hint}>
+            Connect to backend first (press Recheck).
+          </Text>
+        ) : null}
+
         {loadingPredict ? (
           <ActivityIndicator style={{ marginTop: 12 }} size="large" />
         ) : null}
@@ -205,15 +215,23 @@ export default function MushroomTypeScreen() {
               {result.label} ({formatPct(result.confidence)})
             </Text>
 
-            <Text style={styles.resultTitle}>Top Predictions</Text>
-            {(result.top_k || []).map((item, idx) => (
-              <Text key={`${item.label}-${idx}`} style={styles.resultLine}>
-                {idx + 1}. {item.label} — {formatPct(item.confidence)}
-              </Text>
-            ))}
-
+            {/* When unknown, show ONLY result + message. No Top Predictions */}
             {result.message ? (
               <Text style={styles.note}>{result.message}</Text>
+            ) : null}
+
+            {/* Show Top Predictions ONLY when ok=true */}
+            {result.ok === true &&
+            Array.isArray(result.top_k) &&
+            result.top_k.length > 0 ? (
+              <>
+                <Text style={styles.resultTitle}>Top Predictions</Text>
+                {result.top_k.map((item, idx) => (
+                  <Text key={`${item.label}-${idx}`} style={styles.resultLine}>
+                    {idx + 1}. {item.label} — {formatPct(item.confidence)}
+                  </Text>
+                ))}
+              </>
             ) : null}
           </View>
         ) : (
@@ -224,56 +242,102 @@ export default function MushroomTypeScreen() {
   );
 }
 
+
+const PRIMARY_BLUE = "#2563EB";   // Blue (primary)
+//const BLUE_DARK = "#1D4ED8";      // Pressed/darker
+const LIGHT_BLUE = "#E0ECFF";     // Light background for outlined btn
+const BORDER = "#E5E7EB";
+const BG = "#F8FAFC";
+
 const styles = StyleSheet.create({
-  container: { padding: 16, gap: 12, paddingBottom: 28 },
-  title: { fontSize: 22, fontWeight: "700" },
-  subTitle: { marginTop: -6, fontSize: 14, opacity: 0.75 },
+  container: {
+    padding: 16,
+    gap: 12,
+    paddingBottom: 28,
+    backgroundColor: BG,
+  },
+
+  title: { fontSize: 22, fontWeight: "700", color: "#0F172A" },
+  subTitle: { marginTop: -6, fontSize: 14, opacity: 0.75, color: "#334155" },
+
   card: {
+    backgroundColor: "#FFFFFF",
     borderWidth: 1,
-    borderColor: "#ddd",
+    borderColor: BORDER,
     borderRadius: 14,
     padding: 14,
     gap: 10,
   },
-  cardTitle: { fontSize: 16, fontWeight: "700" },
+
+  cardTitle: { fontSize: 16, fontWeight: "700", color: "#0F172A" },
+
   row: { flexDirection: "row", gap: 10 },
+
   rowBetween: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
   },
+
+  // 🔵 Primary blue buttons (Choose Image / Capture Image / Predict)
   btn: {
     flex: 1,
-    backgroundColor: "#222",
+    backgroundColor: PRIMARY_BLUE,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: "center",
   },
+
   btnDisabled: { opacity: 0.5 },
-  btnText: { color: "#fff", fontWeight: "600", fontSize: 13 },
+
+  btnText: {
+    color: "#FFFFFF",
+    fontWeight: "700",
+    fontSize: 14,
+  },
+
+  // 🔹 Secondary button (Recheck / Clear style)
   smallBtn: {
     paddingVertical: 8,
     paddingHorizontal: 12,
     borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#333",
+    borderWidth: 1.5,
+    borderColor: PRIMARY_BLUE,
+    backgroundColor: LIGHT_BLUE,
   },
-  smallBtnText: { fontWeight: "600", fontSize: 12 },
-  image: { width: "100%", height: 220, borderRadius: 12 },
+
+  smallBtnText: {
+    fontWeight: "700",
+    fontSize: 12,
+    color: PRIMARY_BLUE,
+  },
+
+  image: {
+    width: "100%",
+    height: 220,
+    borderRadius: 12,
+    backgroundColor: "#F1F5F9",
+  },
+
   status: { fontWeight: "700" },
-  ok: { color: "green" },
-  bad: { color: "red" },
-  hint: { fontSize: 12, opacity: 0.75 },
-  error: { color: "red", fontWeight: "600" },
+  ok: { color: "#16A34A" },
+  bad: { color: "#DC2626" },
+
+  hint: { fontSize: 12, opacity: 0.75, color: "#475569" },
+  error: { color: "#DC2626", fontWeight: "700" },
+
   resultBox: {
     marginTop: 12,
     padding: 12,
     borderRadius: 12,
-    backgroundColor: "#f5f5f5",
+    backgroundColor: "#F1F5F9",
     gap: 6,
+    borderWidth: 1,
+    borderColor: "#E2E8F0",
   },
-  resultTitle: { fontWeight: "700", marginTop: 6 },
-  resultMain: { fontSize: 18, fontWeight: "800" },
-  resultLine: { fontSize: 13 },
-  note: { marginTop: 8, fontStyle: "italic", opacity: 0.8 },
+
+  resultTitle: { fontWeight: "800", marginTop: 6, color: "#0F172A" },
+  resultMain: { fontSize: 18, fontWeight: "900", color: "#0F172A" },
+  resultLine: { fontSize: 13, color: "#0F172A" },
+  note: { marginTop: 8, fontStyle: "italic", opacity: 0.85, color: "#334155" },
 });
