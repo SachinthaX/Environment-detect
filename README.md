@@ -2,7 +2,7 @@
 
 A comprehensive IoT-enabled decision-support system for mushroom cultivation that combines real-time environmental monitoring, AI-powered disease detection, and intelligent variety recommendations to help small and medium-scale farmers optimize yields and reduce losses.
 
-![Project Banner](./docs/images/banner.jpeg)
+![Project Banner](./assets/banner.jpeg)
 
 <p align="center">
   <b>Environmental Monitoring</b> • <b>AI Disease Detection</b> • <b>Growth Prediction</b>
