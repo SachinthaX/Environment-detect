@@ -2,6 +2,16 @@
 
 A comprehensive IoT-enabled decision-support system for mushroom cultivation that combines real-time environmental monitoring, AI-powered disease detection, and intelligent variety recommendations to help small and medium-scale farmers optimize yields and reduce losses.
 
+![Project Banner](./docs/images/banner.png)
+
+<p align="center">
+  <b>Environmental Monitoring</b> • <b>AI Disease Detection</b> • <b>Growth Prediction</b>
+</p>
+
+<p align="center">
+  A comprehensive IoT-enabled decision-support system for mushroom cultivation...
+</p>
+
 ## 🍄 Overview
 
 Mushroom cultivation is highly sensitive to environmental conditions—particularly temperature and relative humidity. Manual monitoring often misses critical deviations that can lead to contamination or reduced yields. This system provides an intelligent, automated solution with real-time alerts, trend analysis, and AI-powered insights.
@@ -430,10 +440,9 @@ This project is developed as part of academic research at SLIIT.
 
 | Student ID | Name | Research Focus |
 |------------|------|----------------|
-| IT22353566 | Nipuna Sachintha | Environmental monitoring, alerts, recommendation engine, system integration |
 | IT22889188 | Dhananjaya S.M.A | Disease detection AI model development |
-| IT22911162 | Yakupitiyage Chamath Yukthila | Growth prediction research |
-| IT22350350 | Sachindra K.T.N | Harvest optimization research |
+| IT22353566 | Sachintha H.N    | Environmental monitoring, alerts, recommendation engine, system integration |
+| IT22911162 | Yukthila Y.C     | Growth prediction research |
 
 ---
 
