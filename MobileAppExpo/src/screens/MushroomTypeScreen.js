@@ -37,7 +37,6 @@ export default function MushroomTypeScreen() {
 
   useEffect(() => {
     doPing();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const doPing = async () => {
@@ -48,7 +47,7 @@ export default function MushroomTypeScreen() {
       const data = await pingBackend();
       setServerOk(true);
       setServerMsg(data?.message || "pong");
-    } catch (e) {
+    } catch (_e) {
       setServerOk(false);
       setServerMsg("");
       setError("Server not reachable. (Ping failed)");
@@ -245,7 +244,7 @@ export default function MushroomTypeScreen() {
 
 
 const PRIMARY_BLUE = "#2563EB";   // Blue (primary)
-const BLUE_DARK = "#1D4ED8";      // Pressed/darker
+//const BLUE_DARK = "#1D4ED8";      // Pressed/darker
 const LIGHT_BLUE = "#E0ECFF";     // Light background for outlined btn
 const BORDER = "#E5E7EB";
 const BG = "#F8FAFC";

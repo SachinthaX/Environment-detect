@@ -2,7 +2,8 @@ import 'react-native-gesture-handler';
 import React from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { Ionicons } from '@expo/vector-icons';
+//import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 import HomeScreen from './src/screens/HomeScreen';
 import EnvironmentScreen from './src/screens/EnvironmentScreen';
@@ -32,21 +33,30 @@ export default function App() {
           tabBarInactiveTintColor: '#64748b',
 
           tabBarIcon: ({ color, size }) => {
-            let iconName;
+            if (route.name === 'Type') {
+              return (
+                <MaterialCommunityIcons
+                  name="mushroom"
+                  size={size}
+                  color={color}
+                />
+              );
+            }
 
+            let iconName;
             if (route.name === 'Home') iconName = 'home';
-            else if (route.name === 'Environment') iconName = 'leaf';
+            else if (route.name === 'Environmental Monitoring') iconName = 'thermometer';
             else if (route.name === 'Pests') iconName = 'bug';
             else if (route.name === 'Disease') iconName = 'medkit';
             else if (route.name === 'Growth') iconName = 'stats-chart';
-            else if (route.name === 'Type') iconName = 'pricetag';
 
             return <Ionicons name={iconName} size={size} color={color} />;
           },
+
         })}
       >
         <Tab.Screen name="Home" component={HomeScreen} />
-        <Tab.Screen name="Environment" component={EnvironmentScreen} />
+        <Tab.Screen name="Environmental Monitoring" component={EnvironmentScreen} />
         <Tab.Screen name="Pests" component={PestDetectionScreen} />
         <Tab.Screen name="Disease" component={DiseaseDetectionScreen} />
         <Tab.Screen name="Growth" component={GrowthPredictionScreen} />
