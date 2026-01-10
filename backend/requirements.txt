@@ -2,3 +2,9 @@ fastapi
 uvicorn[standard]
 pydantic
 numpy
+tzdata
+psycopg[binary]
+psycopg_pool
+pillow
+python-multipart
+tensorflow
