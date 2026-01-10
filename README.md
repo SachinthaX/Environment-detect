@@ -1,3 +1,5 @@
+[![API Docs](https://img.shields.io/badge/API-Documentation-blue?style=for-the-badge)](docs/api_spec.md)
+
 # Smart Mushroom Cultivation Analytics Framework
 
 A comprehensive IoT-enabled decision-support system for mushroom cultivation that combines real-time environmental monitoring, AI-powered disease detection, and intelligent variety recommendations to help small and medium-scale farmers optimize yields and reduce losses.
@@ -90,8 +92,8 @@ flowchart TB
 
 ### 2. Intelligent Alert System
 Reduces false alarms using a consecutive-reading algorithm:
-- **Alert activation**: 6 consecutive out-of-range readings required
-- **Alert deactivation**: 2 consecutive in-range readings required
+- **Alert activation**: 10 consecutive out-of-range readings required
+- **Alert deactivation**: 5 consecutive in-range readings required
 - **Persistent state**: Alert counters and messages stored in database
 - **Parameter-specific**: Independent alerts for temperature and humidity
 
@@ -440,9 +442,9 @@ This project is developed as part of academic research at SLIIT.
 
 | Student ID | Name | Research Focus |
 |------------|------|----------------|
-| IT22889188 | Dhananjaya S.M.A | Disease detection AI model development |
-| IT22353566 | Sachintha H.N    | Environmental monitoring, alerts, recommendation engine, system integration |
-| IT22911162 | Yukthila Y.C     | Growth prediction research |
+| IT22889188 | Dhananjaya S.M.A | Visual mushroom Disease detection and treatment reccomendation system |
+| IT22353566 | Sachintha H.N    | Environmental monitoring, alerts, recommendation engine |
+| IT22911162 | Yukthila Y.C     | Mushroom type detection and Growth prediction |
 
 ---
 
@@ -456,6 +458,7 @@ This project is developed as part of academic research at SLIIT.
 
 ## 🔮 Future Enhancements
 
+- **Treatment Recommendation**: Knowledge-based guidance that suggests practical control steps based on the predicted disease and severity
 - **Pest Detection**: AI model integration for pest identification (endpoint ready)
 - **Growth Prediction**: ML-based yield forecasting (endpoint ready)
 - **Multi-user Support**: Authentication and user-specific profiles
