@@ -1,0 +1,114 @@
+[
+  {
+    "bag_id": "Bag-1",
+    "label": "green_mold",
+    "severity": "moderate",
+    "severity_score": 2,
+    "confidence": 0.7956846952438354,
+    "timestamp": "2026-03-05T15:55:43.837100Z"
+  },
+  {
+    "bag_id": "Bag-1",
+    "label": "green_mold",
+    "severity": "severe",
+    "severity_score": 3,
+    "confidence": 0.986375629901886,
+    "timestamp": "2026-03-05T15:56:04.272432Z"
+  },
+  {
+    "bag_id": "Bag-1",
+    "label": "green_mold",
+    "severity": "severe",
+    "severity_score": 3,
+    "confidence": 0.9826960563659668,
+    "timestamp": "2026-03-05T15:56:20.291618Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "green_mold",
+    "severity": "mild",
+    "severity_score": 1,
+    "confidence": 0.48031729459762573,
+    "timestamp": "2026-03-05T15:56:49.298166Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "healthy",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.6696785688400269,
+    "timestamp": "2026-03-05T15:57:01.258747Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "black_mold",
+    "severity": "severe",
+    "severity_score": 3,
+    "confidence": 0.9205834865570068,
+    "timestamp": "2026-03-05T15:57:15.024862Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "black_mold",
+    "severity": "mild",
+    "severity_score": 1,
+    "confidence": 0.454641729593277,
+    "timestamp": "2026-03-05T15:57:28.493651Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "black_mold",
+    "severity": "mild",
+    "severity_score": 1,
+    "confidence": 0.42779773473739624,
+    "timestamp": "2026-03-05T15:57:42.596143Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "healthy",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.5443692803382874,
+    "timestamp": "2026-03-05T15:57:57.597062Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "healthy",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.6696785688400269,
+    "timestamp": "2026-03-05T15:58:09.699679Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "healthy",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.6696785688400269,
+    "timestamp": "2026-03-05T15:58:13.903950Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "healthy",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.7204989790916443,
+    "timestamp": "2026-03-05T15:58:25.135457Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "invalid_image",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.824334442615509,
+    "timestamp": "2026-03-05T15:58:42.860028Z"
+  },
+  {
+    "bag_id": "Bag-2",
+    "label": "invalid_image",
+    "severity": "none",
+    "severity_score": 0,
+    "confidence": 0.9179122447967529,
+    "timestamp": "2026-03-05T15:58:56.896709Z"
+  }
+]
