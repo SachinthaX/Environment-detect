@@ -8,3 +8,4 @@ psycopg_pool
 pillow
 python-multipart
 tensorflow
+groq 
