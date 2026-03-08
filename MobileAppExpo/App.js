@@ -9,6 +9,7 @@ import HomeScreen from './src/screens/HomeScreen';
 import EnvironmentScreen from './src/screens/environment/EnvironmentScreen';
 import EnvironmentSolutionScreen from './src/screens/environment/EnvironmentSolutionScreen';
 import EnvironmentForecastScreen from './src/screens/environment/EnvironmentForecastScreen';
+import EnvironmentVarietyScreen from './src/screens/environment/EnvironmentVarietyScreen';
 import PestDetectionScreen from './src/screens/PestDetectionScreen';
 import DiseaseDetectionScreen from './src/screens/DiseaseDetectionScreen';
 import GrowthPredictionScreen from './src/screens/GrowthPredictionScreen';
@@ -40,6 +41,11 @@ function EnvironmentStackNavigator() {
         name="EnvironmentForecast"
         component={EnvironmentForecastScreen}
         options={{ title: '60-Minute Forecast' }}
+      />
+      <EnvironmentStack.Screen
+        name="EnvironmentVariety"
+        component={EnvironmentVarietyScreen}
+        options={{ title: 'Variety Recommendation' }}
       />
     </EnvironmentStack.Navigator>
   );
