@@ -105,13 +105,22 @@ function SelectModal({ visible, title, items, onClose, onPick }) {
   );
 }
 
-function SimpleLineChart({ points, field, yMin, yMax, height = 150, yTicks = null }) {
+function SimpleLineChart({
+  points,
+  field,
+  yMin,
+  yMax,
+  height = 150,
+  yTicks = null,
+  showAverage = false,
+  averageDecimals = 1,
+}) {
   const [width, setWidth] = useState(0);
 
-  const paddingLeft = 44;
-  const paddingRight = 10;
-  const paddingTop = 10;
-  const paddingBottom = 24;
+const paddingLeft = 36;
+const paddingRight = 20;
+const paddingTop = 10;
+const paddingBottom = 24;
 
   const n = points?.length || 0;
 
@@ -134,6 +143,20 @@ function SimpleLineChart({ points, field, yMin, yMax, height = 150, yTicks = nul
     return Array.from(new Set([0, q1, q2, q3, n - 1]));
   }, [n]);
 
+  const avgValue = useMemo(() => {
+    if (!showAverage || !points?.length) return null;
+
+    const vals = points
+      .map((p) => p?.[field])
+      .filter((v) => v !== null && v !== undefined && Number.isFinite(Number(v)))
+      .map(Number);
+
+    if (!vals.length) return null;
+
+    const avg = vals.reduce((sum, v) => sum + v, 0) / vals.length;
+    return Number(avg.toFixed(averageDecimals));
+  }, [showAverage, points, field, averageDecimals]);
+
   const fmtTime = (iso) => {
     if (!iso) return '';
     const d = new Date(iso);
@@ -143,9 +166,9 @@ function SimpleLineChart({ points, field, yMin, yMax, height = 150, yTicks = nul
     return `${hh}:${mm}`;
   };
 
-  const { linePath, areaPaths, plotW, plotH } = useMemo(() => {
+  const { linePath, areaPaths, plotW, plotH, avgY } = useMemo(() => {
     if (!width) {
-      return { linePath: '', areaPaths: [], plotW: 0, plotH: 0 };
+      return { linePath: '', areaPaths: [], plotW: 0, plotH: 0, avgY: null };
     }
 
     const w = width;
@@ -155,17 +178,23 @@ function SimpleLineChart({ points, field, yMin, yMax, height = 150, yTicks = nul
     const ph = Math.max(10, h - paddingTop - paddingBottom);
     const bY = paddingTop + ph;
 
-    if (!points || points.length < 2) {
-      return { linePath: '', areaPaths: [], plotW: pw, plotH: ph, baseY: bY };
-    }
-
-    const scaleX = (i) => paddingLeft + (i / (points.length - 1)) * pw;
-
     const scaleY = (v) => {
       const clamped = Math.max(yMin, Math.min(yMax, v));
       const t = (clamped - yMin) / (yMax - yMin);
       return paddingTop + (1 - t) * ph;
     };
+
+    if (!points || points.length < 2) {
+      return {
+        linePath: '',
+        areaPaths: [],
+        plotW: pw,
+        plotH: ph,
+        avgY: avgValue != null ? scaleY(avgValue) : null,
+      };
+    }
+
+    const scaleX = (i) => paddingLeft + (i / (points.length - 1)) * pw;
 
     let lp = '';
     let started = false;
@@ -213,17 +242,21 @@ function SimpleLineChart({ points, field, yMin, yMax, height = 150, yTicks = nul
       return d;
     });
 
-    return { linePath: lp.trim(), areaPaths: ap, plotW: pw, plotH: ph, baseY: bY };
-  }, [width, height, points, field, yMin, yMax]);
-
-  const gradientId = `areaGrad_${field}`;
+    return {
+      linePath: lp.trim(),
+      areaPaths: ap,
+      plotW: pw,
+      plotH: ph,
+      avgY: avgValue != null ? scaleY(avgValue) : null,
+    };
+  }, [width, height, points, field, yMin, yMax, avgValue]);
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ width: '100%', height }}>
       {width > 0 ? (
         <Svg width={width} height={height}>
           <Defs>
-            <LinearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <LinearGradient id={`areaGrad_${field}`} x1="0" y1="0" x2="0" y2="1">
               <Stop offset="0%" stopColor={C.primary} stopOpacity="0.28" />
               <Stop offset="60%" stopColor={C.primary} stopOpacity="0.12" />
               <Stop offset="100%" stopColor={C.primary} stopOpacity="0.00" />
@@ -290,8 +323,31 @@ function SimpleLineChart({ points, field, yMin, yMax, height = 150, yTicks = nul
             );
           })}
 
+          {avgY != null ? (
+            <>
+              <Line
+                x1={paddingLeft}
+                y1={avgY}
+                x2={paddingLeft + plotW}
+                y2={avgY}
+                stroke={C.chartTick}
+                strokeWidth="1"
+                strokeDasharray="4 4"
+              />
+              <SvgText
+                x={paddingLeft + plotW - 4}
+                y={avgY - 6}
+                fontSize="10"
+                fill={C.chartTick}
+                textAnchor="end"
+              >
+                {`Avg ${avgValue}`}
+              </SvgText>
+            </>
+          ) : null}
+
           {areaPaths.map((d, idx) => (
-            <Path key={`area-${idx}`} d={d} fill={`url(#${gradientId})`} stroke="none" />
+            <Path key={`area-${idx}`} d={d} fill={`url(#areaGrad_${field})`} stroke="none" />
           ))}
 
           {linePath ? <Path d={linePath} stroke={C.primary} strokeWidth="2.5" fill="none" /> : null}
@@ -452,13 +508,9 @@ export default function EnvironmentView(props) {
       </Card>
 
       <Card title="Quick actions">
-        <Text style={[styles.subtle, { marginTop: 0 }]}>
-          Open forecast, recommended actions, or variety matching.
-        </Text>
-
-        <View style={{ marginTop: 12, gap: 10 }}>
+        <View style={{ gap: 10 }}>
           <Pressable style={styles.primaryBtn} onPress={onOpenForecast}>
-            <Text style={styles.primaryBtnText}>View 60-minute forecast</Text>
+            <Text style={styles.primaryBtnText}>View environment forecast</Text>
           </Pressable>
 
           <Pressable style={styles.primaryBtn} onPress={onOpenSolutionRecommendation}>
@@ -570,14 +622,14 @@ export default function EnvironmentView(props) {
 
         <Text style={styles.subtle}>{graphHint}</Text>
 
-        <Text style={[styles.sectionTitle, { marginTop: 12 }]}>Temperature (0–45°C)</Text>
-        <SimpleLineChart points={historyPoints} field="temperature" yMin={0} yMax={45} yTicks={[0, 15, 30, 45]} />
+        <Text style={[styles.sectionTitle, { marginTop: 12 }]}>Temperature (°C)</Text>
+        <SimpleLineChart points={historyPoints} field="temperature" yMin={0} yMax={45} yTicks={[0, 15, 30, 45]} showAverage/>
 
-        <Text style={[styles.sectionTitle, { marginTop: 12 }]}>Humidity (0–100%RH)</Text>
-        <SimpleLineChart points={historyPoints} field="humidity" yMin={0} yMax={100} yTicks={[0, 50, 100]} />
+        <Text style={[styles.sectionTitle, { marginTop: 12 }]}>Humidity (% RH)</Text>
+        <SimpleLineChart points={historyPoints} field="humidity" yMin={0} yMax={100} yTicks={[0, 50, 100]} showAverage />
 
-        <Text style={[styles.sectionTitle, { marginTop: 12 }]}>CO₂ (0–5000 ppm)</Text>
-        <SimpleLineChart points={historyPoints} field="co2" yMin={0} yMax={5000} yTicks={[0, 2500, 5000]} />
+        <Text style={[styles.sectionTitle, { marginTop: 12 }]}>CO₂ (ppm)</Text>
+        <SimpleLineChart points={historyPoints} field="co2" yMin={0} yMax={5000} yTicks={[0, 2500, 5000]} showAverage />
       </Card>
 
 

@@ -31,13 +31,13 @@ function SectionCard({ title, children, tint = '#F6F8FC', border = 'rgba(15, 23,
   );
 }
 
-function InfoRow({ label, value, valueColor = C.text }) {
+function InfoRow({ label, value, valueColor = C.text, noBorder = false }) {
   return (
     <View
       style={{
         marginTop: 10,
-        paddingBottom: 10,
-        borderBottomWidth: 1,
+        paddingBottom: noBorder ? 0 : 10,
+        borderBottomWidth: noBorder ? 0 : 1,
         borderBottomColor: 'rgba(15, 23, 42, 0.08)',
       }}
     >
@@ -112,15 +112,16 @@ function getCopy(lang) {
       ? 'වත්මන් පාරිසරික තත්ත්වය අනුව ගැළපෙන ක්‍රියාමාර්ග'
       : 'Recommended actions based on the current environmental condition',
     currentCondition: isSi ? 'වර්තමාන තත්ත්වය' : 'Current condition',
-    mushroom: isSi ? 'බිම්මල් වර්ගය' : 'Mushroom',
+    mushroom: isSi ? 'බිම්මල් වර්ගය' : 'Mushroom type',
     stage: isSi ? 'අවධිය' : 'Stage',
     currentValue: isSi ? 'වත්මන් අගය' : 'Current value',
     optimalRange: isSi ? 'සුදුසු පරාසය' : 'Optimal range',
     issueType: isSi ? 'ගැටලුව' : 'Issue',
+    activeIssues: isSi ? 'ක්‍රියාත්මක ගැටලු' : 'Active issues',
     immediate: isSi ? 'ක්ෂණික ක්‍රියාමාර්ග' : 'Immediate actions',
     shortTerm: isSi ? 'කෙටි කාලීන ක්‍රියාමාර්ග' : 'Short-term actions',
     longTerm: isSi ? 'දිගු කාලීන ක්‍රියාමාර්ග' : 'Long-term actions',
-    safety: isSi ? 'ආරක්ෂාව' : 'Safety',
+    safety: isSi ? 'ආරක්ෂිත ක්‍රියාමාර්ග' : 'Safety actions',
     loading: isSi ? 'විසඳුම් මාර්ග පූරණය වෙමින්...' : 'Loading recommended actions...',
     error: isSi ? 'විසඳුම් මාර්ග පූරණය කළ නොහැකි විය.' : 'Failed to load solution recommendation.',
     helper: isSi
@@ -148,7 +149,7 @@ function getCopy(lang) {
     rangeLabels: {
       temperature: isSi ? 'සුදුසු උෂ්ණත්ව පරාසය' : 'Suitable temperature range',
       humidity: isSi ? 'සුදුසු ආර්ද්‍රතා පරාසය' : 'Suitable humidity range',
-      co2: isSi ? 'සුදුසු CO₂ මට්ටම' : 'Suitable CO₂ range',
+      co2: isSi ? 'සුදුසු CO₂ පරාසය' : 'Suitable CO₂ range',
     },
   };
 }
@@ -220,12 +221,29 @@ function getMetricChipBg(metric) {
   return '#EFF6FF';
 }
 
+function shortIssueTitle(issue, lang) {
+  if (!issue) return 'Issue';
+
+  if (lang === 'si') {
+    if (issue.metric === 'temperature') return 'උෂ්ණත්වය';
+    if (issue.metric === 'humidity') return 'ආර්ද්‍රතාවය';
+    if (issue.metric === 'co2') return 'CO₂';
+    return issue.title || 'ගැටලුව';
+  }
+
+  if (issue.metric === 'temperature') return 'Temperature';
+  if (issue.metric === 'humidity') return 'Humidity';
+  if (issue.metric === 'co2') return 'CO₂';
+  return issue.title || 'Issue';
+}
+
 export default function EnvironmentSolutionScreen() {
   const [lang, setLang] = useState('en');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [data, setData] = useState(null);
   const [error, setError] = useState('');
+  const [selectedIssueCode, setSelectedIssueCode] = useState(null);
 
   const copy = useMemo(() => getCopy(lang), [lang]);
 
@@ -239,10 +257,14 @@ export default function EnvironmentSolutionScreen() {
       setError('');
       const res = await fetchEnvironmentSolutionRecommendation(nextLang);
       setData(res);
+      setSelectedIssueCode(
+        res?.primary_issue_code || res?.active_issues?.[0]?.issue_code || null
+      );
     } catch (e) {
       console.log('fetchEnvironmentSolutionRecommendation error:', e);
       setError(nextCopy.error);
       setData(null);
+      setSelectedIssueCode(null);
     } finally {
       if (isRefresh) setRefreshing(false);
       else setLoading(false);
@@ -254,7 +276,10 @@ export default function EnvironmentSolutionScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lang]);
 
-  const metric = data?.metric || 'temperature';
+  const selectedIssue =
+    data?.active_issues?.find((item) => item.issue_code === selectedIssueCode) || null;
+
+  const metric = selectedIssue?.metric || 'temperature';
   const accent = getMetricAccent(metric);
   const chipBg = getMetricChipBg(metric);
   const metricLabel = copy.metricLabels[metric] || metric;
@@ -298,29 +323,66 @@ export default function EnvironmentSolutionScreen() {
             </Pressable>
           </View>
 
-          <View
-            style={{
-              marginTop: 14,
-              alignSelf: 'flex-start',
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 999,
-              backgroundColor: chipBg,
-              borderWidth: 1,
-              borderColor: accent + '33',
-            }}
-          >
-            <Text style={{ color: accent, fontWeight: '800', fontSize: 12 }}>
-              {metricLabel}
-            </Text>
-          </View>
+          {!error && data?.active_issues?.length > 1 ? (
+            <View
+              style={{
+                marginTop: 14,
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 10,
+              }}
+            >
+              {data.active_issues.map((issue) => {
+                const isActive = selectedIssueCode === issue.issue_code;
+                return (
+                  <Pressable
+                    key={issue.issue_code}
+                    onPress={() => setSelectedIssueCode(issue.issue_code)}
+                    style={{
+                      paddingHorizontal: 14,
+                      paddingVertical: 10,
+                      borderRadius: 14,
+                      borderWidth: 1,
+                      borderColor: isActive ? 'rgba(37, 99, 235, 0.24)' : C.border,
+                      backgroundColor: isActive ? 'rgba(37, 99, 235, 0.10)' : '#FFFFFF',
+                    }}
+                  >
+                    <Text
+                      style={{
+                        color: isActive ? C.primary : C.text,
+                        fontWeight: '800',
+                        fontSize: 14,
+                      }}
+                    >
+                      {shortIssueTitle(issue, lang)}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+          ) : null}
+
+          {!error && !data?.note && selectedIssue ? (
+            <View
+              style={{
+                marginTop: 14,
+                alignSelf: 'flex-start',
+                paddingHorizontal: 10,
+                paddingVertical: 6,
+                borderRadius: 999,
+                backgroundColor: chipBg,
+                borderWidth: 1,
+                borderColor: `${accent}33`,
+              }}
+            >
+              <Text style={{ color: accent, fontWeight: '800', fontSize: 12 }}>
+                {metricLabel}
+              </Text>
+            </View>
+          ) : null}
 
           {error ? (
-            <SectionCard
-              title={copy.pageTitle}
-              tint="#FEF2F2"
-              border="#FECACA"
-            >
+            <SectionCard title={copy.pageTitle} tint="#FEF2F2" border="#FECACA">
               <Text style={[styles.subtle, { marginTop: 10, color: C.bad, lineHeight: 21 }]}>
                 {error}
               </Text>
@@ -343,32 +405,26 @@ export default function EnvironmentSolutionScreen() {
 
           {!error && data?.note ? (
             <>
-              <SectionCard
-                title={copy.noIssueTitle}
-                tint="#ECFDF5"
-                border="#BBF7D0"
-              >
+              <SectionCard title={copy.noIssueTitle} tint="#ECFDF5" border="#BBF7D0">
                 <Text style={[styles.subtle, { marginTop: 10, color: C.text, lineHeight: 21 }]}>
                   {data.note}
                 </Text>
               </SectionCard>
 
               <SectionCard title={copy.currentCondition}>
-                <InfoRow
-                  label={copy.mushroom}
-                  value={data?.mushroom_type || '-'}
-                />
+                <InfoRow label={copy.mushroom} value={data?.mushroom_type || '-'} />
                 <InfoRow
                   label={copy.stage}
                   value={formatStage(data?.stage, copy)}
+                  noBorder
                 />
               </SectionCard>
             </>
           ) : null}
 
-          {!error && !data?.note ? (
+          {!error && !data?.note && selectedIssue ? (
             <>
-              <SectionCard title={data?.title || copy.pageTitle}>
+              <SectionCard title={selectedIssue?.title || copy.pageTitle}>
                 <Text style={[styles.subtle, { marginTop: 10, lineHeight: 20 }]}>
                   {copy.helper}
                 </Text>
@@ -385,7 +441,7 @@ export default function EnvironmentSolutionScreen() {
                 >
                   <InfoRow
                     label={copy.issueType}
-                    value={data?.title || '-'}
+                    value={selectedIssue?.title || '-'}
                     valueColor={accent}
                   />
                   <InfoRow
@@ -398,38 +454,37 @@ export default function EnvironmentSolutionScreen() {
                   />
                   <InfoRow
                     label={currentValueLabel}
-                    value={formatSingleValue(data?.current_value, metric)}
+                    value={formatSingleValue(selectedIssue?.current_value, metric)}
                   />
-                  <View style={{ marginTop: 10 }}>
-                    <Text style={[styles.subtle, { marginTop: 0 }]}>{rangeLabel}</Text>
-                    <Text style={{ color: C.text, fontWeight: '800', marginTop: 4, fontSize: 15 }}>
-                      {formatRange(data?.optimal_min, data?.optimal_max, metric)}
-                    </Text>
-                  </View>
+                  <InfoRow
+                    label={rangeLabel}
+                    value={formatRange(selectedIssue?.optimal_min, selectedIssue?.optimal_max, metric)}
+                    noBorder
+                  />
                 </View>
               </SectionCard>
 
               <ActionSection
                 title={copy.immediate}
-                items={data?.immediate || []}
+                items={selectedIssue?.immediate || []}
                 accent="#E57373"
               />
 
               <ActionSection
                 title={copy.shortTerm}
-                items={data?.short_term || []}
+                items={selectedIssue?.short_term || []}
                 accent="#E0A458"
               />
 
               <ActionSection
                 title={copy.longTerm}
-                items={data?.long_term || []}
+                items={selectedIssue?.long_term || []}
                 accent="#6FA8DC"
               />
 
               <ActionSection
                 title={copy.safety}
-                items={data?.safety || []}
+                items={selectedIssue?.safety || []}
                 accent="#9B8AE6"
               />
             </>
