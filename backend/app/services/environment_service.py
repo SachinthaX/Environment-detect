@@ -1,5 +1,7 @@
 from __future__ import annotations
 import os
+import time
+
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo
 from app.data.environment_solution_data import ENVIRONMENT_SOLUTIONS
@@ -40,7 +42,8 @@ from app.schemas.environment import (
     EnvironmentStatusOut,
 )
 
-
+SOLUTION_CACHE = {}
+SOLUTION_CACHE_TTL = 120  # 2 minutes
 # ----------------------------
 # Readings (fast path: one DB connection)
 # ----------------------------
@@ -594,6 +597,89 @@ def _build_plain_solution_message(
     return "\n".join(lines)
 
 
+def _detect_all_issues(reading: dict, optimal: dict) -> list[tuple[str, float, float, float]]:
+    issues = []
+
+    temp = reading.get("temperature")
+    rh = reading.get("humidity")
+    co2 = reading.get("co2") or reading.get("co2_estimated")
+
+    temp_min = optimal.get("temp_min")
+    temp_max = optimal.get("temp_max")
+    rh_min = optimal.get("rh_min")
+    rh_max = optimal.get("rh_max")
+    co2_min = optimal.get("co2_min")
+    co2_max = optimal.get("co2_max")
+
+    if temp is not None and temp_min is not None and temp < temp_min:
+        issues.append(("TEMP_LOW", float(temp), float(temp_min), float(temp_max)))
+    elif temp is not None and temp_max is not None and temp > temp_max:
+        issues.append(("TEMP_HIGH", float(temp), float(temp_min), float(temp_max)))
+
+    if rh is not None and rh_min is not None and rh < rh_min:
+        issues.append(("RH_LOW", float(rh), float(rh_min), float(rh_max)))
+    elif rh is not None and rh_max is not None and rh > rh_max:
+        issues.append(("RH_HIGH", float(rh), float(rh_min), float(rh_max)))
+
+    if co2 is not None and co2_max is not None and float(co2) > float(co2_max):
+        issues.append(("CO2_HIGH", float(co2), float(co2_min) if co2_min is not None else None, float(co2_max)))
+
+    return issues
+
+
+def _build_solution_issue(
+    issue_code: str,
+    current_value: float | None,
+    optimal_min: float | None,
+    optimal_max: float | None,
+    language: str,
+):
+    solution = ENVIRONMENT_SOLUTIONS[issue_code][language]
+    metric = ENVIRONMENT_SOLUTIONS[issue_code]["metric"]
+
+    immediate = solution.get("immediate", [])
+    short_term = solution.get("short_term", [])
+    long_term = solution.get("long_term", [])
+    safety = solution.get("safety", [])
+    title = solution.get("title")
+
+    llm_message = format_solution_with_groq(
+        language=language,
+        title=title,
+        current_value=current_value,
+        optimal_min=optimal_min,
+        optimal_max=optimal_max,
+        immediate=immediate,
+        short_term=short_term,
+        long_term=long_term,
+        safety=safety,
+    )
+
+    if not llm_message:
+        llm_message = _build_plain_solution_message(
+            lang=language,
+            title=title,
+            immediate=immediate,
+            short_term=short_term,
+            long_term=long_term,
+            safety=safety,
+        )
+
+    return {
+        "issue_code": issue_code,
+        "metric": metric,
+        "current_value": current_value,
+        "optimal_min": optimal_min,
+        "optimal_max": optimal_max,
+        "title": title,
+        "immediate": immediate,
+        "short_term": short_term,
+        "long_term": long_term,
+        "safety": safety,
+        "llm_message": llm_message,
+    }
+
+
 def get_environment_solution_recommendation(lang: str = "en") -> EnvironmentSolutionRecommendationOut:
     language = _normalize_lang(lang)
 
@@ -628,7 +714,7 @@ def get_environment_solution_recommendation(lang: str = "en") -> EnvironmentSolu
         note = (
             "Optimal range not found for current profile."
             if language == "en"
-            else "දැනට තෝරා ඇති profile සඳහා optimal range එක හමු නොවීය."
+            else "දැනට තෝරා ඇති profile සඳහා optimal range එක hamu nowee."
         )
         return EnvironmentSolutionRecommendationOut(
             language=language,
@@ -637,9 +723,9 @@ def get_environment_solution_recommendation(lang: str = "en") -> EnvironmentSolu
             note=note,
         )
 
-    issue_code, current_value, optimal_min, optimal_max = _detect_primary_issue(reading, optimal)
+    issues = _detect_all_issues(reading, optimal)
 
-    if not issue_code:
+    if not issues:
         note = (
             "Environment is within the optimal range right now."
             if language == "en"
@@ -652,53 +738,23 @@ def get_environment_solution_recommendation(lang: str = "en") -> EnvironmentSolu
             note=note,
         )
 
-    solution = ENVIRONMENT_SOLUTIONS[issue_code][language]
-    metric = ENVIRONMENT_SOLUTIONS[issue_code]["metric"]
-
-    immediate = solution.get("immediate", [])
-    short_term = solution.get("short_term", [])
-    long_term = solution.get("long_term", [])
-    safety = solution.get("safety", [])
-    title = solution.get("title")
-
-    generated_message = format_solution_with_groq(
-        language=language,
-        title=title,
-        current_value=current_value,
-        optimal_min=optimal_min,
-        optimal_max=optimal_max,
-        immediate=immediate,
-        short_term=short_term,
-        long_term=long_term,
-        safety=safety,
-    )
-
-    used_llm = bool(generated_message)
-
-    if not generated_message:
-        generated_message = _build_plain_solution_message(
-            lang=language,
-            title=title,
-            immediate=immediate,
-            short_term=short_term,
-            long_term=long_term,
-            safety=safety,
+    active_issues = []
+    for issue_code, current_value, optimal_min, optimal_max in issues:
+        issue_data = _build_solution_issue(
+            issue_code=issue_code,
+            current_value=current_value,
+            optimal_min=optimal_min,
+            optimal_max=optimal_max,
+            language=language,
         )
+        active_issues.append(issue_data)
+
+    primary_issue_code = active_issues[0]["issue_code"] if active_issues else None
 
     return EnvironmentSolutionRecommendationOut(
         language=language,
         mushroom_type=profile.get("mushroom_type"),
         stage=profile.get("stage"),
-        issue_code=issue_code,
-        metric=metric,
-        current_value=current_value,
-        optimal_min=optimal_min,
-        optimal_max=optimal_max,
-        title=title,
-        immediate=immediate,
-        short_term=short_term,
-        long_term=long_term,
-        safety=safety,
-        llm_message=generated_message,
-        used_llm=used_llm,
+        primary_issue_code=primary_issue_code,
+        active_issues=active_issues,
     )
